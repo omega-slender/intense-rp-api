@@ -1,0 +1,6 @@
+customtkinter
+flask
+waitress
+cryptography
+selenium
+webdriver-manager
