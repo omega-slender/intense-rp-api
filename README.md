@@ -4,9 +4,9 @@
 ![Preview](https://github.com/omega-slender/intense-rp-api/blob/main/images/Preview.gif)
 
 ## 📋 Requirements
-### 🖥️ For the Source Code
+### 📦 For the Source Code
 - 🐍 **Python**: Install from [python.org](https://www.python.org/).
-- 📦 **Required Libraries**: `customtkinter`, `flask`, `waitress`, `cryptography`, `selenium`, and `webdriver-manager`.
+- 📚 **Required Libraries**: `customtkinter`, `flask`, `waitress`, `cryptography`, `selenium`, and `webdriver-manager`.
 
 ### 🖥️ Windows Version
 - ✅ No additional installations are required.
@@ -40,7 +40,7 @@
 4. Then, go to **Utility Prompts**:
    - Under [Impersonation prompt](https://github.com/omega-slender/intense-rp-api/blob/main/images/Impersonation%20prompt.png), enter: `[Generate a response by fully embodying the role of {{user}}, strictly following the given context. Do not assume the identity of {{char}} at any point, and stay in character at all times. Avoid repeating concepts or phrases, and do not seek approval for your writing style. The response should use up to {{max_tokens}} tokens and a temperature of {{temperature}}.]`
    - Under [Group Nudge prompt template](https://github.com/omega-slender/intense-rp-api/blob/main/images/Group%20Nudge%20prompt%20template.png), enter: `[Generate a response by faithfully portraying the role of {{char}}, strictly following the provided context. Do not assume the identity of {{user}}, any other characters, or entities under any circumstances, and do not break character. Avoid repeating concepts or phrases, and do not seek approval for your writing style. The response must be generated using up to {{max_tokens}} tokens and with a temperature of {{temperature}}.]`
-5. Finally, access **Prompts** and configure the following order:
+5. Finally, access [Prompts](https://github.com/omega-slender/intense-rp-api/blob/main/images/Prompts.png) and configure the following order:
    - Main Prompt
    - World Info (before)
    - Persona Description
