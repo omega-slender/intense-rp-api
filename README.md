@@ -1,5 +1,5 @@
 # 🎭 Intense RP API
-**Intense RP API** is an API with an intuitive visual interface that enables the unofficial integration of DeepSeek into SillyTavern.
+**Intense RP** is an API with an intuitive visual interface that enables the unofficial integration of DeepSeek into SillyTavern.
 
 ![Preview](https://github.com/omega-slender/intense-rp-api/blob/main/images/Preview.gif)
 
