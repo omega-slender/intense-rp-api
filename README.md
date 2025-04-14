@@ -3,6 +3,9 @@
 
 ![Preview](https://github.com/omega-slender/intense-rp-api/blob/main/images/Preview.gif)
 
+## ⚠️ Cloudflare Issues
+If you're having trouble getting past **Cloudflare**, it's highly recommended to use **Google Chrome**, as it tends to be the most reliable browser for bypassing Cloudflare verification.
+
 ## 📋 Requirements
 ### 📦 For the Source Code
 - 🐍 **Python**: Install from [python.org](https://www.python.org/).
