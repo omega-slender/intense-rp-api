@@ -22,7 +22,7 @@ def load_key(base_path):
             return key_file.read()
     return None
 
-def save_config(base_path, email, password, browser, show_ip=True, show_console=False):
+def save_config(base_path, email, password, browser, show_ip=True, show_console=False, auto_login=False):
     key = load_key(base_path)
     if not key:
         generate_key(base_path)
@@ -34,7 +34,8 @@ def save_config(base_path, email, password, browser, show_ip=True, show_console=
         "password": password,
         "browser": browser,
         "show_ip": show_ip,
-        "show_console": show_console
+        "show_console": show_console,
+        "auto_login": auto_login
     }
     encrypted_data = cipher.encrypt(json.dumps(data).encode())
 
@@ -47,7 +48,7 @@ def load_config(base_path):
     key = load_key(base_path)
     config_path = get_config_path(base_path)
     if not key or not os.path.exists(config_path):
-        return None, None, "Chrome", True, False
+        return None, None, "Chrome", True, False, False
 
     cipher = Fernet(key)
     with open(config_path, "rb") as config_file:
@@ -60,7 +61,8 @@ def load_config(base_path):
             decrypted_data.get("password"),
             decrypted_data.get("browser", "Chrome"),
             decrypted_data.get("show_ip", True),
-            decrypted_data.get("show_console", False)
+            decrypted_data.get("show_console", False),
+            decrypted_data.get("auto_login", False)
         )
     except:
-        return None, None, "Chrome", True, False
+        return None, None, "Chrome", True, False, False

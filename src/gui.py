@@ -15,6 +15,7 @@ config_password = None
 config_browser = None
 config_show_ip = None
 config_show_console = None
+config_auto_login = None
 
 class ConsoleRedirector:
     def __init__(self, callback):
@@ -31,7 +32,7 @@ class ConsoleRedirector:
         pass
 
 def load_files():
-    global save_path, icon_path, config_email, config_password, config_browser, config_show_ip, config_show_console
+    global save_path, icon_path, config_email, config_password, config_browser, config_show_ip, config_show_console, config_auto_login
     
     script_path = os.path.dirname(os.path.realpath(__file__))
     
@@ -46,7 +47,7 @@ def load_files():
     icon_path = possible_icon_path if os.path.isfile(possible_icon_path) else None
 
     save_path = os.path.join(base_path, "save")
-    config_email, config_password, config_browser, config_show_ip, config_show_console = config_manager.load_config(save_path)
+    config_email, config_password, config_browser, config_show_ip, config_show_console, config_auto_login = config_manager.load_config(save_path)
 
 def create_console_window():
     global console_window, console_textbox
@@ -169,12 +170,11 @@ def add_colors(widget):
     except Exception as e:
         print(f"Error adding colors: {e}")
 
-def start_services():    
+def start_services():
     try:
         textbox_clear(textbox)
         textbox_add(textbox, "[color:green]Please wait...")
-        api.assign_config(config_email, config_password, config_browser, config_show_ip)
-        print("Starting Selenium.")
+        api.assign_config(config_email, config_password, config_browser, config_show_ip, config_auto_login)
         threading.Thread(target=api.run_services, daemon=True).start()
     except Exception as e:        
         textbox_clear(textbox)
@@ -192,17 +192,17 @@ def open_config_window():
 
         if icon_path:
             config_window.after(200, lambda: config_window.iconbitmap(icon_path))
-            
+
         root.update_idletasks()
         x = root.winfo_x() + (root.winfo_width() // 2) - (400 // 2)
-        y = root.winfo_y() + (root.winfo_height() // 2) - (410 // 2)
-        config_window.geometry(f"400x410+{x}+{y}")
-        config_window.minsize(400, 410)
-        
+        y = root.winfo_y() + (root.winfo_height() // 2) - (460 // 2)
+        config_window.geometry(f"400x460+{x}+{y}")
+        config_window.minsize(400, 460)
+
         config_window.grid_columnconfigure(0, weight=1)
         config_window.grid_columnconfigure(1, weight=1)
 
-        for i in range(10):
+        for i in range(11):
             config_window.grid_rowconfigure(i, weight=1)
 
         account_label = ctk.CTkLabel(config_window, text="DeepSeek Account", font=("Arial", 14, "bold"))
@@ -216,45 +216,74 @@ def open_config_window():
 
         pass_label = ctk.CTkLabel(config_window, text="Password:")
         pass_label.grid(row=2, column=0, padx=10, pady=5, sticky="w")
-        pass_entry = ctk.CTkEntry(config_window, width=250, show="*")
-        pass_entry.grid(row=2, column=1, padx=10, pady=5, sticky="ew")
+
+        pass_frame = ctk.CTkFrame(config_window, fg_color="transparent")
+        pass_frame.grid(row=2, column=1, padx=10, pady=5, sticky="ew")
+        pass_frame.grid_columnconfigure(0, weight=1)
+
+        pass_entry = ctk.CTkEntry(pass_frame, show="*")
+        pass_entry.grid(row=0, column=0, padx=(0, 5), sticky="ew")
         pass_entry.insert(0, config_password if config_password else "")
 
+        def toggle_password_visibility():
+            if pass_entry.cget("show") == "*":
+                pass_entry.configure(show="")
+                toggle_button.configure(text="Hide")
+            else:
+                pass_entry.configure(show="*")
+                toggle_button.configure(text="Show")
+
+        toggle_button = ctk.CTkButton(pass_frame, text="Show", width=60, command=toggle_password_visibility)
+        toggle_button.grid(row=0, column=1, sticky="e")
+
+        auto_login_label = ctk.CTkLabel(config_window, text="Auto Login:")
+        auto_login_label.grid(row=3, column=0, padx=10, pady=5, sticky="w")
+        auto_login_var = ctk.BooleanVar(value=config_auto_login)
+        auto_login_switch = ctk.CTkSwitch(config_window, variable=auto_login_var, text="")
+        auto_login_switch.grid(row=3, column=1, padx=10, pady=5, sticky="w")
+
         selenium_label = ctk.CTkLabel(config_window, text="Selenium Settings", font=("Arial", 14, "bold"))
-        selenium_label.grid(row=3, column=0, columnspan=2, padx=10, pady=(10, 5), sticky="w")
+        selenium_label.grid(row=4, column=0, columnspan=2, padx=10, pady=(10, 5), sticky="w")
 
         browser_label = ctk.CTkLabel(config_window, text="Browser:")
-        browser_label.grid(row=4, column=0, padx=10, pady=5, sticky="w")
-        browser_options = ["Chrome", "Firefox", "Edge"]
+        browser_label.grid(row=5, column=0, padx=10, pady=5, sticky="w")
+        browser_options = ["Chrome", "Firefox", "Edge", "Safari"]
         browser_var = ctk.StringVar(value=config_browser if config_browser else "Chrome")
         browser_menu = ctk.CTkOptionMenu(config_window, variable=browser_var, values=browser_options)
-        browser_menu.grid(row=4, column=1, padx=10, pady=5, sticky="ew")
+        browser_menu.grid(row=5, column=1, padx=10, pady=5, sticky="ew")
 
         api_label = ctk.CTkLabel(config_window, text="API Settings", font=("Arial", 14, "bold"))
-        api_label.grid(row=5, column=0, columnspan=2, padx=10, pady=(10, 5), sticky="w")
+        api_label.grid(row=6, column=0, columnspan=2, padx=10, pady=(10, 5), sticky="w")
 
         show_ip_label = ctk.CTkLabel(config_window, text="Show IP:")
-        show_ip_label.grid(row=6, column=0, padx=10, pady=5, sticky="w")
+        show_ip_label.grid(row=7, column=0, padx=10, pady=5, sticky="w")
         show_ip_var = ctk.BooleanVar(value=config_show_ip)
         show_ip_switch = ctk.CTkSwitch(config_window, variable=show_ip_var, text="")
-        show_ip_switch.grid(row=6, column=1, padx=10, pady=5, sticky="w")
+        show_ip_switch.grid(row=7, column=1, padx=10, pady=5, sticky="w")
 
         advanced_label = ctk.CTkLabel(config_window, text="Advanced Settings", font=("Arial", 14, "bold"))
-        advanced_label.grid(row=7, column=0, columnspan=2, padx=10, pady=(10, 5), sticky="w")
+        advanced_label.grid(row=8, column=0, columnspan=2, padx=10, pady=(10, 5), sticky="w")
 
         show_console_label = ctk.CTkLabel(config_window, text="Show Console:")
-        show_console_label.grid(row=8, column=0, padx=10, pady=5, sticky="w")
+        show_console_label.grid(row=9, column=0, padx=10, pady=5, sticky="w")
         show_console_var = ctk.BooleanVar(value=config_show_console)
         show_console_switch = ctk.CTkSwitch(config_window, variable=show_console_var, text="")
-        show_console_switch.grid(row=8, column=1, padx=10, pady=5, sticky="w")
+        show_console_switch.grid(row=9, column=1, padx=10, pady=5, sticky="w")
 
         button_frame = ctk.CTkFrame(config_window)
-        button_frame.grid(row=9, column=0, columnspan=2, padx=10, pady=10, sticky="ew")
+        button_frame.grid(row=10, column=0, columnspan=2, padx=10, pady=10, sticky="ew")
         button_frame.grid_columnconfigure(0, weight=1)
         button_frame.grid_columnconfigure(1, weight=1)
 
-        save_button = ctk.CTkButton(button_frame, text="Save", command=lambda: save_config(config_window, email_entry, pass_entry, browser_var, show_ip_var, show_console_var))
+        save_button = ctk.CTkButton(
+            button_frame, text="Save",
+            command=lambda: save_config(
+                config_window, email_entry, pass_entry, browser_var,
+                show_ip_var, show_console_var, auto_login_var
+            )
+        )
         save_button.grid(row=0, column=0, padx=5, sticky="ew")
+
         cancel_button = ctk.CTkButton(button_frame, text="Cancel", command=config_window.destroy)
         cancel_button.grid(row=0, column=1, padx=5, sticky="ew")
 
@@ -262,15 +291,16 @@ def open_config_window():
     except Exception as e:
         print(f"Error opening config window: {e}")
 
-def save_config(config_window, email_entry, pass_entry, browser_var, show_ip_var, show_console_var):
+def save_config(config_window, email_entry, pass_entry, browser_var, show_ip_var, show_console_var, auto_login_var):
     try:
-        global config_email, config_password, config_browser, config_show_ip, config_show_console, console_window
+        global config_email, config_password, config_browser, config_show_ip, config_show_console, console_window, config_auto_login
         config_email = email_entry.get()
         config_password = pass_entry.get()
         config_browser = browser_var.get()
         config_show_ip = show_ip_var.get()
         config_show_console = show_console_var.get()
-        config_manager.save_config(save_path, config_email, config_password, config_browser, config_show_ip, config_show_console)
+        config_auto_login = auto_login_var.get()
+        config_manager.save_config(save_path, config_email, config_password, config_browser, config_show_ip, config_show_console, config_auto_login)
         
         if console_window:
             toggle_console_window(config_show_console)
@@ -296,7 +326,7 @@ def create_gui():
         load_files()
 
         root = ctk.CTk()
-        root.title("INTENSE RP API V2.0")
+        root.title("INTENSE RP API V2.1")
 
         if icon_path:
             root.iconbitmap(default=icon_path)
@@ -307,19 +337,16 @@ def create_gui():
         root.minsize(200, 250)
 
         def on_closing():
-            try:
-                api.close_selenium()
-            except Exception as e:
-                print(f"Error closing selenium: {e}")
-            finally:
-                if root:
-                    root.destroy()
+            api.close_selenium()
+
+            if root:
+                root.destroy()
         
         root.protocol("WM_DELETE_WINDOW", on_closing)
         root.grid_rowconfigure(1, weight=1)
         root.grid_columnconfigure(0, weight=1)
 
-        title_label = ctk.CTkLabel(root, text="INTENSE RP API V2.0", font=("Arial", 18, "bold"))
+        title_label = ctk.CTkLabel(root, text="INTENSE RP API V2.1", font=("Arial", 18, "bold"))
         title_label.grid(row=0, column=0, padx=10, pady=(10, 0), sticky="nsew")
 
         textbox = ctk.CTkTextbox(root, state="disabled", font=("Arial", 16), wrap="none")

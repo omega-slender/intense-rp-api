@@ -1,6 +1,7 @@
-customtkinter
 flask
 waitress
-cryptography
+customtkinter
 selenium
+seleniumbase
+cryptography
 webdriver-manager

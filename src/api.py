@@ -11,6 +11,7 @@ config_show_ip = True
 config_browser = None
 config_password = None
 config_email = None
+config_auto_login = False
 
 last_response = 0
 textbox = None
@@ -161,12 +162,16 @@ def generate_response(character_info, r1, streaming):
         return create_response("Error receiving response.", streaming)
 
 def run_services():
-    global driver, config_email, config_password, config_browser, config_show_ip
+    global driver, config_email, config_password, config_browser, config_show_ip, config_auto_login, last_response
+    
+    last_response = 0
     driver = selenium.initialize_webdriver(config_browser)
     
     if driver:
         threading.Thread(target=monitor_driver, daemon=True).start()
-        selenium.login_to_site(driver, config_email, config_password)
+
+        if config_auto_login:
+            selenium.login_to_site(driver, config_email, config_password)
         
         clear_messages()
         show_message("[color:red]API IS NOW ACTIVE!")
@@ -190,12 +195,13 @@ def clear_messages():
     global textbox
     textbox_clear(textbox)
 
-def assign_config(email, password, browser, show_api):
-    global config_email, config_password, config_browser, config_show_ip
+def assign_config(email, password, browser, show_api, auto_login):
+    global config_email, config_password, config_browser, config_show_ip, config_auto_login
     config_email = email
     config_password = password
     config_browser = browser
     config_show_ip = show_api
+    config_auto_login = auto_login
 
 def assign_textbox(object):
     global textbox
