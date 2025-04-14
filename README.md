@@ -6,7 +6,7 @@
 ## 📋 Requirements
 ### 📦 For the Source Code
 - 🐍 **Python**: Install from [python.org](https://www.python.org/).
-- 📚 **Required Libraries**: `customtkinter`, `flask`, `waitress`, `cryptography`, `selenium`, and `webdriver-manager`.
+- 📚 **Required Libraries**: `customtkinter`, `flask`, `waitress`, `cryptography`, `selenium`, `webdriver-manager` and `SeleniumBase`.
 
 ### 🖥️ Windows Version
 - ✅ No additional installations are required.
