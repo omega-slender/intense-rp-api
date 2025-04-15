@@ -12,10 +12,12 @@ icon_path = None
 
 config_email = None
 config_password = None
-config_browser = None
-config_show_ip = None
-config_show_console = None
-config_auto_login = None
+config_browser = "Chrome"
+config_show_ip = True
+config_show_console = False
+config_auto_login = False
+config_deepthink = False
+config_search = False
 
 class ConsoleRedirector:
     def __init__(self, callback):
@@ -32,7 +34,7 @@ class ConsoleRedirector:
         pass
 
 def load_files():
-    global save_path, icon_path, config_email, config_password, config_browser, config_show_ip, config_show_console, config_auto_login
+    global save_path, icon_path, config_email, config_password, config_browser, config_show_ip, config_show_console, config_auto_login, config_deepthink, config_search
     
     script_path = os.path.dirname(os.path.realpath(__file__))
     
@@ -47,7 +49,7 @@ def load_files():
     icon_path = possible_icon_path if os.path.isfile(possible_icon_path) else None
 
     save_path = os.path.join(base_path, "save")
-    config_email, config_password, config_browser, config_show_ip, config_show_console, config_auto_login = config_manager.load_config(save_path)
+    config_email, config_password, config_browser, config_show_ip, config_show_console, config_auto_login, config_deepthink, config_search = config_manager.load_config(save_path)
 
 def create_console_window():
     global console_window, console_textbox
@@ -175,6 +177,7 @@ def start_services():
         textbox_clear(textbox)
         textbox_add(textbox, "[color:green]Please wait...")
         api.assign_config(config_email, config_password, config_browser, config_show_ip, config_auto_login)
+        api.assign_response_config(config_deepthink, config_search)
         threading.Thread(target=api.run_services, daemon=True).start()
     except Exception as e:        
         textbox_clear(textbox)
@@ -195,15 +198,15 @@ def open_config_window():
 
         root.update_idletasks()
         x = root.winfo_x() + (root.winfo_width() // 2) - (400 // 2)
-        y = root.winfo_y() + (root.winfo_height() // 2) - (460 // 2)
-        config_window.geometry(f"400x460+{x}+{y}")
-        config_window.minsize(400, 460)
+        y = root.winfo_y() + (root.winfo_height() // 2) - (560 // 2)
+        config_window.geometry(f"400x560+{x}+{y}")
+        config_window.minsize(400, 560)
 
+        for i in range(14):
+            config_window.grid_rowconfigure(i, weight=1)
+        
         config_window.grid_columnconfigure(0, weight=1)
         config_window.grid_columnconfigure(1, weight=1)
-
-        for i in range(11):
-            config_window.grid_rowconfigure(i, weight=1)
 
         account_label = ctk.CTkLabel(config_window, text="DeepSeek Account", font=("Arial", 14, "bold"))
         account_label.grid(row=0, column=0, columnspan=2, padx=10, pady=(10, 5), sticky="w")
@@ -252,26 +255,41 @@ def open_config_window():
         browser_menu = ctk.CTkOptionMenu(config_window, variable=browser_var, values=browser_options)
         browser_menu.grid(row=5, column=1, padx=10, pady=5, sticky="ew")
 
+        response_label = ctk.CTkLabel(config_window, text="Response settings", font=("Arial", 14, "bold"))
+        response_label.grid(row=6, column=0, columnspan=2, padx=10, pady=(10, 5), sticky="w")
+
+        deepthink_label = ctk.CTkLabel(config_window, text="DeepThink (R1):")
+        deepthink_label.grid(row=7, column=0, padx=10, pady=5, sticky="w")
+        deepthink_var = ctk.BooleanVar(value=config_deepthink)
+        deepthink_switch = ctk.CTkSwitch(config_window, variable=deepthink_var, text="")
+        deepthink_switch.grid(row=7, column=1, padx=10, pady=5, sticky="w")
+
+        search_label = ctk.CTkLabel(config_window, text="Search:")
+        search_label.grid(row=8, column=0, padx=10, pady=5, sticky="w")
+        search_var = ctk.BooleanVar(value=config_search)
+        search_switch = ctk.CTkSwitch(config_window, variable=search_var, text="")
+        search_switch.grid(row=8, column=1, padx=10, pady=5, sticky="w")
+
         api_label = ctk.CTkLabel(config_window, text="API Settings", font=("Arial", 14, "bold"))
-        api_label.grid(row=6, column=0, columnspan=2, padx=10, pady=(10, 5), sticky="w")
+        api_label.grid(row=9, column=0, columnspan=2, padx=10, pady=(10, 5), sticky="w")
 
         show_ip_label = ctk.CTkLabel(config_window, text="Show IP:")
-        show_ip_label.grid(row=7, column=0, padx=10, pady=5, sticky="w")
+        show_ip_label.grid(row=10, column=0, padx=10, pady=5, sticky="w")
         show_ip_var = ctk.BooleanVar(value=config_show_ip)
         show_ip_switch = ctk.CTkSwitch(config_window, variable=show_ip_var, text="")
-        show_ip_switch.grid(row=7, column=1, padx=10, pady=5, sticky="w")
+        show_ip_switch.grid(row=10, column=1, padx=10, pady=5, sticky="w")
 
         advanced_label = ctk.CTkLabel(config_window, text="Advanced Settings", font=("Arial", 14, "bold"))
-        advanced_label.grid(row=8, column=0, columnspan=2, padx=10, pady=(10, 5), sticky="w")
+        advanced_label.grid(row=11, column=0, columnspan=2, padx=10, pady=(10, 5), sticky="w")
 
         show_console_label = ctk.CTkLabel(config_window, text="Show Console:")
-        show_console_label.grid(row=9, column=0, padx=10, pady=5, sticky="w")
+        show_console_label.grid(row=12, column=0, padx=10, pady=5, sticky="w")
         show_console_var = ctk.BooleanVar(value=config_show_console)
         show_console_switch = ctk.CTkSwitch(config_window, variable=show_console_var, text="")
-        show_console_switch.grid(row=9, column=1, padx=10, pady=5, sticky="w")
+        show_console_switch.grid(row=12, column=1, padx=10, pady=5, sticky="w")
 
-        button_frame = ctk.CTkFrame(config_window)
-        button_frame.grid(row=10, column=0, columnspan=2, padx=10, pady=10, sticky="ew")
+        button_frame = ctk.CTkFrame(config_window, fg_color="transparent")
+        button_frame.grid(row=13, column=0, columnspan=2, padx=10, pady=10, sticky="ew")
         button_frame.grid_columnconfigure(0, weight=1)
         button_frame.grid_columnconfigure(1, weight=1)
 
@@ -279,7 +297,7 @@ def open_config_window():
             button_frame, text="Save",
             command=lambda: save_config(
                 config_window, email_entry, pass_entry, browser_var,
-                show_ip_var, show_console_var, auto_login_var
+                show_ip_var, show_console_var, auto_login_var, deepthink_var, search_var
             )
         )
         save_button.grid(row=0, column=0, padx=5, sticky="ew")
@@ -291,20 +309,36 @@ def open_config_window():
     except Exception as e:
         print(f"Error opening config window: {e}")
 
-def save_config(config_window, email_entry, pass_entry, browser_var, show_ip_var, show_console_var, auto_login_var):
+def save_config(config_window, email_entry, pass_entry, browser_var, show_ip_var, show_console_var, auto_login_var, deepthink_var, search_var):
     try:
-        global config_email, config_password, config_browser, config_show_ip, config_show_console, console_window, config_auto_login
+        global config_email, config_password, config_browser, config_show_ip, config_show_console, console_window, config_auto_login, config_deepthink, config_search
+
         config_email = email_entry.get()
         config_password = pass_entry.get()
         config_browser = browser_var.get()
         config_show_ip = show_ip_var.get()
         config_show_console = show_console_var.get()
         config_auto_login = auto_login_var.get()
-        config_manager.save_config(save_path, config_email, config_password, config_browser, config_show_ip, config_show_console, config_auto_login)
+        config_deepthink = deepthink_var.get()
+        config_search = search_var.get()
+
+        config_manager.save_config(
+            save_path,
+            config_email,
+            config_password,
+            config_browser,
+            config_show_ip,
+            config_show_console,
+            config_auto_login,
+            config_deepthink,
+            config_search
+        )
+
+        api.assign_response_config(config_deepthink, config_search)
         
         if console_window:
             toggle_console_window(config_show_console)
-        
+
         print("Saved config.")
         config_window.destroy()
     except Exception as e:
@@ -326,7 +360,7 @@ def create_gui():
         load_files()
 
         root = ctk.CTk()
-        root.title("INTENSE RP API V2.1")
+        root.title("INTENSE RP API V2.2")
 
         if icon_path:
             root.iconbitmap(default=icon_path)
@@ -346,7 +380,7 @@ def create_gui():
         root.grid_rowconfigure(1, weight=1)
         root.grid_columnconfigure(0, weight=1)
 
-        title_label = ctk.CTkLabel(root, text="INTENSE RP API V2.1", font=("Arial", 18, "bold"))
+        title_label = ctk.CTkLabel(root, text="INTENSE RP API V2.2", font=("Arial", 18, "bold"))
         title_label.grid(row=0, column=0, padx=10, pady=(10, 0), sticky="nsew")
 
         textbox = ctk.CTkTextbox(root, state="disabled", font=("Arial", 16), wrap="none")

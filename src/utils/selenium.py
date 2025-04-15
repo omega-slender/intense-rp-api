@@ -73,26 +73,39 @@ def new_chat(driver):
 
 def set_r1_state(driver, activate=False):
     try:
-        button = driver.find_element(By.XPATH, "//div[@role='button' and contains(@class, '_3172d9f')]")
+        button = driver.find_element(By.XPATH, "//div[@role='button' and contains(@class, '_3172d9f') and contains(., 'R1')]")
         style = button.get_attribute("style")
-        
-        if "rgba(77, 107, 254, 0.40)" in style:
-            is_active = True
-        elif "transparent" in style:
-            is_active = False
-        else:
-            is_active = False
+        is_active = "rgba(77, 107, 254, 0.40)" in style
         
         if is_active != activate:
-            button.click()
+            try:
+                button.click()
+            except ElementClickInterceptedException:
+                driver.execute_script("arguments[0].click();", button)
+            time.sleep(0.5)
     except Exception as e:
-        print(f"Error activating R1: {e}")
-        pass
+        print(f"Error setting R1 button state: {e}")
 
-def reset_and_configure_chat(driver, r1):
+def set_search_state(driver, activate=False):
+    try:
+        button = driver.find_element(By.XPATH, "//div[@role='button' and contains(@class, '_3172d9f') and not(contains(., 'R1'))]")
+        style = button.get_attribute("style")
+        is_active = "rgba(77, 107, 254, 0.40)" in style
+        
+        if is_active != activate:
+            try:
+                button.click()
+            except ElementClickInterceptedException:
+                driver.execute_script("arguments[0].click();", button)
+            time.sleep(0.5)
+    except Exception as e:
+        print(f"Error setting Search button state: {e}")
+
+def reset_and_configure_chat(driver, r1, search):
     close_sidebar(driver)
     new_chat(driver)
     set_r1_state(driver, r1)
+    set_search_state(driver, search)
 
 def send_chat_message(driver, input_message):
     try:

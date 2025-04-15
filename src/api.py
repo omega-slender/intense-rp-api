@@ -12,6 +12,8 @@ config_browser = None
 config_password = None
 config_email = None
 config_auto_login = False
+config_deepthink = False
+config_search = False
 
 last_response = 0
 textbox = None
@@ -40,22 +42,28 @@ def bot_response():
             print("Error: Empty data was received.")
             return jsonify({}), 503
         
-        character_info, r1 = process_character(data)
+        character_info, streaming, r1, search = process_character(data)
         if not character_info:
             print("Error: Data could not be processed.")
             return jsonify({}), 503
         
-        global driver
+        global driver, config_deepthink, config_search
         if not driver:
             print("Error: Selenium is not active.")
             return jsonify({}), 503
         
-        return generate_response(character_info, r1, data.get("stream", False))
+        if config_deepthink:
+            r1 = True
+
+        if config_search:
+            search = True
+        
+        return generate_response(character_info, streaming, r1, search)
     except Exception as e:
         print(f"Error receiving data: {e}")
         return jsonify({}), 500
 
-def generate_response(character_info, r1, streaming):
+def generate_response(character_info, streaming, r1, search):
     global driver, last_response
     
     last_response += 1
@@ -74,7 +82,7 @@ def generate_response(character_info, r1, streaming):
         if interrupted():
             return create_response("", streaming)
 
-        selenium.reset_and_configure_chat(driver, r1)
+        selenium.reset_and_configure_chat(driver, r1, search)
         show_message("[color:white]- [color:cyan]Chat reset and configured.")
 
         if interrupted():
@@ -177,7 +185,7 @@ def run_services():
         show_message("[color:red]API IS NOW ACTIVE!")
         show_message("[color:cyan]WELCOME TO INTENSE RP API V2.0")
         show_message("[color:yellow]URL 1: [color:white]http://127.0.0.1:5000/")
-
+        
         if config_show_ip:
             local_ip = socket.gethostbyname(socket.gethostname())
             show_message(f"[color:yellow]URL 2: [color:white]http://{local_ip}:5000/")
@@ -202,6 +210,11 @@ def assign_config(email, password, browser, show_api, auto_login):
     config_browser = browser
     config_show_ip = show_api
     config_auto_login = auto_login
+
+def assign_response_config(deepthink, search):
+    global config_deepthink, config_search
+    config_deepthink = deepthink
+    config_search = search
 
 def assign_textbox(object):
     global textbox

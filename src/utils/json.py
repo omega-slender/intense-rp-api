@@ -6,39 +6,46 @@ def process_character(put_data):
         messages = put_data.get("messages", [])
         temperature = put_data.get("temperature", 1)
         max_tokens = put_data.get("max_tokens", 300)
+        streaming = put_data.get("stream", False)
         r1 = False
-        
+        search = False
+
         if len(messages) >= 2 and messages[-1].get("role") == 'system' and messages[-2].get("role") == 'system':
             messages.pop(-2)
 
         if len(messages) >= 2 and messages[-2].get("role") == 'user':
             content = messages[-2].get("content", "")
+            
             if re.search(r"({{r1}}|\[r1\]|\(r1\))", content, re.IGNORECASE):
                 r1 = True
+            
+            if re.search(r"({{search}}|\[search\])", content, re.IGNORECASE):
+                search = True
         
         formatted_messages = [f"{msg.get('role', '')}: {msg.get('content', '')}" for msg in messages]
         character_info = "\n\n".join(formatted_messages).replace("system: ", "")
         character_info = re.sub(r"(\w+): (\w+): ", r"\1: ", character_info)
-        
+
         character_name_match = re.search(r'DATA1: "([^\"]*)"', character_info)
         user_name_match = re.search(r'DATA2: "([^\"]*)"', character_info)
-        
+
         character_name = character_name_match.group(1) if character_name_match else 'Character'
         user_name = user_name_match.group(1) if user_name_match else 'User'
-        
+
         character_info = re.sub(r"({{r1}}|\[r1\]|\(r1\))", "", character_info, flags=re.IGNORECASE)
-        character_info = re.sub(r"DATA1: \"([^\"]*)\"", "", character_info)
-        character_info = re.sub(r"DATA2: \"([^\"]*)\"", "", character_info)
-        
+        character_info = re.sub(r"({{search}}|\[search\])", "", character_info, flags=re.IGNORECASE)
+        character_info = re.sub(r'DATA1: "([^"]*)"', "", character_info)
+        character_info = re.sub(r'DATA2: "([^"]*)"', "", character_info)
+
         character_info = character_info.replace("assistant:", character_name + ":").replace("user:", user_name + ":")
         character_info = character_info.replace("{{temperature}}", str(temperature)).replace("{{max_tokens}}", str(max_tokens))
         character_info = re.sub(r'\n{3,}', '\n\n', character_info)
         character_info = f"[Important Information]\n{character_info}"
-        
-        return character_info, r1
+
+        return character_info, streaming, r1, search
     except Exception as e:
         print(f"Error processing character info: {e}")
-        return None, None
+        return None, False, False, False
 
 def get_model():
     return jsonify({
