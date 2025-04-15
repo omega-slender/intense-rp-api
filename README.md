@@ -67,7 +67,7 @@ If you're having trouble getting past **Cloudflare**, it's highly recommended to
   - `{{max_tokens}}`  
   - `{{temperature}}`  
 
-- To activate **DeepThink (R1)** mode, simply add `{{r1}}` or `[r1]` anywhere in your message before sending it.
+- To manually activate **DeepThink (R1)** or **Search** mode, simply include `{{r1}}` or `[r1]` in your message for DeepThink (R1), and `{{search}}` or `[search]` for Search.
 
 ## 🌐 Contact
 Discover more about me and my projects on my [Linktree](https://linktr.ee/omega_slender).
