@@ -354,7 +354,7 @@ def create_gui():
         load_files()
         
         root = ctk.CTk()
-        root.title(f"INTENSE RP API V{version} BETA")
+        root.title(f"INTENSE RP API V{version}")
 
         if icon_path:
             root.iconbitmap(default=icon_path)
@@ -374,7 +374,7 @@ def create_gui():
         root.grid_rowconfigure(1, weight=1)
         root.grid_columnconfigure(0, weight=1)
 
-        title_label = ctk.CTkLabel(root, text=f"INTENSE RP API V{version} BETA", font=("Arial", 18, "bold"))
+        title_label = ctk.CTkLabel(root, text=f"INTENSE RP API V{version}", font=("Arial", 18, "bold"))
         title_label.grid(row=0, column=0, padx=10, pady=(10, 0), sticky="nsew")
 
         textbox = ctk.CTkTextbox(root, state="disabled", font=("Arial", 16), wrap="none")
