@@ -1,72 +1,61 @@
 from cryptography.fernet import Fernet
 import json, os
 
-def get_key_path(base_path):
-    return os.path.join(base_path, "secret.key")
+class EncryptedConfigManager:
+    def __init__(self, base_path):
+        self.base_path = base_path
+        self.key_path = os.path.join(self.base_path, "secret.key")
+        self.config_path = os.path.join(self.base_path, "config.enc")
 
-def get_config_path(base_path):
-    return os.path.join(base_path, "config.enc")
+    def generate_key(self):
+        if not os.path.exists(self.key_path):
+            key = Fernet.generate_key()
+            with open(self.key_path, "wb") as key_file:
+                key_file.write(key)
+    
+    def load_key(self):
+        if os.path.exists(self.key_path):
+            with open(self.key_path, "rb") as key_file:
+                return key_file.read()
+        return None
 
-def generate_key(base_path):
-    key_path = get_key_path(base_path)
-    if not os.path.exists(key_path):
-        key = Fernet.generate_key()
-        os.makedirs(base_path, exist_ok=True)
-        with open(key_path, "wb") as key_file:
-            key_file.write(key)
+    def save_config(self, config):
+        os.makedirs(self.base_path, exist_ok=True)
+        
+        key = self.load_key()
+        if not key:
+            self.generate_key()
+            key = self.load_key()
 
-def load_key(base_path):
-    key_path = get_key_path(base_path)
-    if os.path.exists(key_path):
-        with open(key_path, "rb") as key_file:
-            return key_file.read()
-    return None
+        cipher = Fernet(key)
+        encrypted_data = cipher.encrypt(json.dumps(config).encode())
 
-def save_config(base_path, email, password, browser, show_ip=True, show_console=False, auto_login=False, deepthink=True, search=True):
-    key = load_key(base_path)
-    if not key:
-        generate_key(base_path)
-        key = load_key(base_path)
-
-    cipher = Fernet(key)
-    data = {
-        "email": email,
-        "password": password,
-        "browser": browser,
-        "show_ip": show_ip,
-        "show_console": show_console,
-        "auto_login": auto_login,
-        "deepthink": deepthink,
-        "search": search
-    }
-    encrypted_data = cipher.encrypt(json.dumps(data).encode())
-
-    os.makedirs(base_path, exist_ok=True)
-    config_path = get_config_path(base_path)
-    with open(config_path, "wb") as config_file:
-        config_file.write(encrypted_data)
-
-def load_config(base_path):
-    key = load_key(base_path)
-    config_path = get_config_path(base_path)
-    if not key or not os.path.exists(config_path):
-        return None, None, "Chrome", True, False, False, False, False
-
-    cipher = Fernet(key)
-    with open(config_path, "rb") as config_file:
-        encrypted_data = config_file.read()
-
-    try:
-        decrypted_data = json.loads(cipher.decrypt(encrypted_data).decode())
-        return (
-            decrypted_data.get("email"),
-            decrypted_data.get("password"),
-            decrypted_data.get("browser", "Chrome"),
-            decrypted_data.get("show_ip", True),
-            decrypted_data.get("show_console", False),
-            decrypted_data.get("auto_login", False),
-            decrypted_data.get("deepthink", False),
-            decrypted_data.get("search", False)
-        )
-    except:
-        return None, None, "Chrome", True, False, False, False, False
+        with open(self.config_path, "wb") as config_file:
+            config_file.write(encrypted_data)
+    
+    def load_config(self, original):
+        key = self.load_key()
+        if not key or not os.path.exists(self.config_path):
+            return original
+        
+        cipher = Fernet(key)
+        try:
+            with open(self.config_path, "rb") as config_file:
+                encrypted_data = config_file.read()
+            decrypted = json.loads(cipher.decrypt(encrypted_data).decode())
+            
+            if isinstance(decrypted, dict):
+                config = {}
+                for k in original:
+                    if isinstance(original[k], dict):
+                        config[k] = {}
+                        for subk in original[k]:
+                            config[k][subk] = decrypted.get(k, {}).get(subk, original[k][subk])
+                    else:
+                        config[k] = decrypted.get(k, original[k])
+                return config
+            else:
+                return original
+        
+        except Exception:
+            return original

@@ -3,21 +3,31 @@ import utils.config_manager as config_manager
 import customtkinter as ctk
 
 root = None
+version = 2.3
+
 console_window = None
 console_textbox = None
 textbox = None
 
-save_path = None
+manager = None
 icon_path = None
 
-config_email = None
-config_password = None
-config_browser = "Chrome"
-config_show_ip = True
-config_show_console = False
-config_auto_login = False
-config_deepthink = False
-config_search = False
+config = {
+    "browser": "Chrome",
+    "model": "DeepSeek",
+    "show_ip": False,
+    "show_console": False,
+    "models": {
+        "deepseek": {
+            "email": "",
+            "password": "",
+            "auto_login": False,
+            "text_file": False,
+            "deepthink": False,
+            "search": False
+        }
+    }
+}
 
 class ConsoleRedirector:
     def __init__(self, callback):
@@ -34,7 +44,7 @@ class ConsoleRedirector:
         pass
 
 def load_files():
-    global save_path, icon_path, config_email, config_password, config_browser, config_show_ip, config_show_console, config_auto_login, config_deepthink, config_search
+    global icon_path, manager, config
     
     script_path = os.path.dirname(os.path.realpath(__file__))
     
@@ -47,10 +57,11 @@ def load_files():
 
     possible_icon_path = os.path.join(icon_base, "icon.ico")
     icon_path = possible_icon_path if os.path.isfile(possible_icon_path) else None
-
     save_path = os.path.join(base_path, "save")
-    config_email, config_password, config_browser, config_show_ip, config_show_console, config_auto_login, config_deepthink, config_search = config_manager.load_config(save_path)
 
+    manager = config_manager.EncryptedConfigManager(save_path)
+    config = manager.load_config(config)
+    
 def create_console_window():
     global console_window, console_textbox
     console_window = ctk.CTkToplevel()
@@ -150,36 +161,14 @@ def textbox_clear(widget):
     except Exception as e:
         print(f"Error clearing textbox: {e}")
 
-def add_colors(widget):
-    if not widget:
-        return
-
-    color_map = {
-        "red": "red",
-        "green": "#13ff00",
-        "yellow": "yellow",
-        "blue": "blue",
-        "cyan": "cyan",
-        "white": "white",
-        "purple": "#e400ff",
-        "orange": "orange",
-        "pink": "pink"
-    }
-    
-    try:
-        for tag, color in color_map.items():
-            widget.tag_config(tag, foreground=color)
-    except Exception as e:
-        print(f"Error adding colors: {e}")
-
 def start_services():
     try:
         textbox_clear(textbox)
         textbox_add(textbox, "[color:green]Please wait...")
-        api.assign_config(config_email, config_password, config_browser, config_show_ip, config_auto_login)
-        api.assign_response_config(config_deepthink, config_search)
+        
+        api.assign_config(config)
         threading.Thread(target=api.run_services, daemon=True).start()
-    except Exception as e:        
+    except Exception as e:
         textbox_clear(textbox)
         textbox_add(textbox, "[color:red]Selenium failed to start.")
         print(f"Error starting services: {e}")
@@ -198,110 +187,115 @@ def open_config_window():
 
         root.update_idletasks()
         x = root.winfo_x() + (root.winfo_width() // 2) - (400 // 2)
-        y = root.winfo_y() + (root.winfo_height() // 2) - (560 // 2)
-        config_window.geometry(f"400x560+{x}+{y}")
-        config_window.minsize(400, 560)
+        y = root.winfo_y() + (root.winfo_height() // 2) - (470 // 2)
+        config_window.geometry(f"400x470+{x}+{y}")
+        config_window.minsize(400, 470)
 
-        for i in range(14):
+        for i in range(12):
             config_window.grid_rowconfigure(i, weight=1)
         
         config_window.grid_columnconfigure(0, weight=1)
         config_window.grid_columnconfigure(1, weight=1)
+        
+        d_settings_label = ctk.CTkLabel(config_window, text="DeepSeek Settings", font=("Arial", 14, "bold"))
+        d_settings_label.grid(row=0, column=0, columnspan=2, padx=10, pady=(10, 5), sticky="w")
 
-        account_label = ctk.CTkLabel(config_window, text="DeepSeek Account", font=("Arial", 14, "bold"))
-        account_label.grid(row=0, column=0, columnspan=2, padx=10, pady=(10, 5), sticky="w")
+        d_email_label = ctk.CTkLabel(config_window, text="Email:")
+        d_email_label.grid(row=1, column=0, padx=10, pady=5, sticky="w")
+        d_email_entry = ctk.CTkEntry(config_window, width=250)
+        d_email_entry.grid(row=1, column=1, padx=10, pady=5, sticky="ew")
+        d_email_entry.insert(0, config["models"]["deepseek"]["email"])
 
-        email_label = ctk.CTkLabel(config_window, text="Email:")
-        email_label.grid(row=1, column=0, padx=10, pady=5, sticky="w")
-        email_entry = ctk.CTkEntry(config_window, width=250)
-        email_entry.grid(row=1, column=1, padx=10, pady=5, sticky="ew")
-        email_entry.insert(0, config_email if config_email else "")
+        d_pass_label = ctk.CTkLabel(config_window, text="Password:")
+        d_pass_label.grid(row=2, column=0, padx=10, pady=5, sticky="w")
 
-        pass_label = ctk.CTkLabel(config_window, text="Password:")
-        pass_label.grid(row=2, column=0, padx=10, pady=5, sticky="w")
+        d_pass_frame = ctk.CTkFrame(config_window, fg_color="transparent")
+        d_pass_frame.grid(row=2, column=1, padx=10, pady=5, sticky="ew")
+        d_pass_frame.grid_columnconfigure(0, weight=1)
 
-        pass_frame = ctk.CTkFrame(config_window, fg_color="transparent")
-        pass_frame.grid(row=2, column=1, padx=10, pady=5, sticky="ew")
-        pass_frame.grid_columnconfigure(0, weight=1)
-
-        pass_entry = ctk.CTkEntry(pass_frame, show="*")
-        pass_entry.grid(row=0, column=0, padx=(0, 5), sticky="ew")
-        pass_entry.insert(0, config_password if config_password else "")
+        d_pass_entry = ctk.CTkEntry(d_pass_frame, show="*")
+        d_pass_entry.grid(row=0, column=0, padx=(0, 5), sticky="ew")
+        d_pass_entry.insert(0, config["models"]["deepseek"]["password"])
 
         def toggle_password_visibility():
-            if pass_entry.cget("show") == "*":
-                pass_entry.configure(show="")
-                toggle_button.configure(text="Hide")
+            if d_pass_entry.cget("show") == "*":
+                d_pass_entry.configure(show="")
+                d_toggle_button.configure(text="Hide")
             else:
-                pass_entry.configure(show="*")
-                toggle_button.configure(text="Show")
+                d_pass_entry.configure(show="*")
+                d_toggle_button.configure(text="Show")
 
-        toggle_button = ctk.CTkButton(pass_frame, text="Show", width=60, command=toggle_password_visibility)
-        toggle_button.grid(row=0, column=1, sticky="e")
+        d_toggle_button = ctk.CTkButton(d_pass_frame, text="Show", width=60, command=toggle_password_visibility)
+        d_toggle_button.grid(row=0, column=1, sticky="e")
 
-        auto_login_label = ctk.CTkLabel(config_window, text="Auto Login:")
-        auto_login_label.grid(row=3, column=0, padx=10, pady=5, sticky="w")
-        auto_login_var = ctk.BooleanVar(value=config_auto_login)
-        auto_login_switch = ctk.CTkSwitch(config_window, variable=auto_login_var, text="")
-        auto_login_switch.grid(row=3, column=1, padx=10, pady=5, sticky="w")
+        d_auto_login_label = ctk.CTkLabel(config_window, text="Auto Login:")
+        d_auto_login_label.grid(row=3, column=0, padx=10, pady=5, sticky="w")
+        d_auto_login_var = ctk.BooleanVar(value=config["models"]["deepseek"]["auto_login"])
+        d_auto_login_switch = ctk.CTkSwitch(config_window, variable=d_auto_login_var, text="")
+        d_auto_login_switch.grid(row=3, column=1, padx=10, pady=5, sticky="w")
 
-        selenium_label = ctk.CTkLabel(config_window, text="Selenium Settings", font=("Arial", 14, "bold"))
-        selenium_label.grid(row=4, column=0, columnspan=2, padx=10, pady=(10, 5), sticky="w")
+        d_text_file_label = ctk.CTkLabel(config_window, text="Text file:")
+        d_text_file_label.grid(row=4, column=0, padx=10, pady=5, sticky="w")
+        d_text_file_var = ctk.BooleanVar(value=config["models"]["deepseek"]["text_file"])
+        d_text_file_switch = ctk.CTkSwitch(config_window, variable=d_text_file_var, text="")
+        d_text_file_switch.grid(row=4, column=1, padx=10, pady=5, sticky="w")
+        
+        d_deepthink_label = ctk.CTkLabel(config_window, text="DeepThink:")
+        d_deepthink_label.grid(row=5, column=0, padx=10, pady=5, sticky="w")
+        d_deepthink_var = ctk.BooleanVar(value=config["models"]["deepseek"]["deepthink"])
+        d_deepthink_switch = ctk.CTkSwitch(config_window, variable=d_deepthink_var, text="")
+        d_deepthink_switch.grid(row=5, column=1, padx=10, pady=5, sticky="w")
 
-        browser_label = ctk.CTkLabel(config_window, text="Browser:")
-        browser_label.grid(row=5, column=0, padx=10, pady=5, sticky="w")
-        browser_options = ["Chrome", "Firefox", "Edge", "Safari"]
-        browser_var = ctk.StringVar(value=config_browser if config_browser else "Chrome")
-        browser_menu = ctk.CTkOptionMenu(config_window, variable=browser_var, values=browser_options)
-        browser_menu.grid(row=5, column=1, padx=10, pady=5, sticky="ew")
-
-        response_label = ctk.CTkLabel(config_window, text="Response settings", font=("Arial", 14, "bold"))
-        response_label.grid(row=6, column=0, columnspan=2, padx=10, pady=(10, 5), sticky="w")
-
-        deepthink_label = ctk.CTkLabel(config_window, text="DeepThink (R1):")
-        deepthink_label.grid(row=7, column=0, padx=10, pady=5, sticky="w")
-        deepthink_var = ctk.BooleanVar(value=config_deepthink)
-        deepthink_switch = ctk.CTkSwitch(config_window, variable=deepthink_var, text="")
-        deepthink_switch.grid(row=7, column=1, padx=10, pady=5, sticky="w")
-
-        search_label = ctk.CTkLabel(config_window, text="Search:")
-        search_label.grid(row=8, column=0, padx=10, pady=5, sticky="w")
-        search_var = ctk.BooleanVar(value=config_search)
-        search_switch = ctk.CTkSwitch(config_window, variable=search_var, text="")
-        search_switch.grid(row=8, column=1, padx=10, pady=5, sticky="w")
-
-        api_label = ctk.CTkLabel(config_window, text="API Settings", font=("Arial", 14, "bold"))
-        api_label.grid(row=9, column=0, columnspan=2, padx=10, pady=(10, 5), sticky="w")
-
-        show_ip_label = ctk.CTkLabel(config_window, text="Show IP:")
-        show_ip_label.grid(row=10, column=0, padx=10, pady=5, sticky="w")
-        show_ip_var = ctk.BooleanVar(value=config_show_ip)
-        show_ip_switch = ctk.CTkSwitch(config_window, variable=show_ip_var, text="")
-        show_ip_switch.grid(row=10, column=1, padx=10, pady=5, sticky="w")
+        d_search_label = ctk.CTkLabel(config_window, text="Search:")
+        d_search_label.grid(row=6, column=0, padx=10, pady=5, sticky="w")
+        d_search_var = ctk.BooleanVar(value=config["models"]["deepseek"]["search"])
+        d_search_switch = ctk.CTkSwitch(config_window, variable=d_search_var, text="")
+        d_search_switch.grid(row=6, column=1, padx=10, pady=5, sticky="w")
 
         advanced_label = ctk.CTkLabel(config_window, text="Advanced Settings", font=("Arial", 14, "bold"))
-        advanced_label.grid(row=11, column=0, columnspan=2, padx=10, pady=(10, 5), sticky="w")
+        advanced_label.grid(row=7, column=0, columnspan=2, padx=10, pady=(10, 5), sticky="w")
+
+        browser_label = ctk.CTkLabel(config_window, text="Browser:")
+        browser_label.grid(row=8, column=0, padx=10, pady=5, sticky="w")
+        browser_options = ["Chrome", "Firefox", "Edge", "Safari"]
+        browser_var = ctk.StringVar(value=config["browser"])
+        browser_menu = ctk.CTkOptionMenu(config_window, variable=browser_var, values=browser_options)
+        browser_menu.grid(row=8, column=1, padx=10, pady=5, sticky="ew")
+
+        show_ip_label = ctk.CTkLabel(config_window, text="Show IP:")
+        show_ip_label.grid(row=9, column=0, padx=10, pady=5, sticky="w")
+        show_ip_var = ctk.BooleanVar(value=config["show_ip"])
+        show_ip_switch = ctk.CTkSwitch(config_window, variable=show_ip_var, text="")
+        show_ip_switch.grid(row=9, column=1, padx=10, pady=5, sticky="w")
 
         show_console_label = ctk.CTkLabel(config_window, text="Show Console:")
-        show_console_label.grid(row=12, column=0, padx=10, pady=5, sticky="w")
-        show_console_var = ctk.BooleanVar(value=config_show_console)
+        show_console_label.grid(row=10, column=0, padx=10, pady=5, sticky="w")
+        show_console_var = ctk.BooleanVar(value=config["show_console"])
         show_console_switch = ctk.CTkSwitch(config_window, variable=show_console_var, text="")
-        show_console_switch.grid(row=12, column=1, padx=10, pady=5, sticky="w")
+        show_console_switch.grid(row=10, column=1, padx=10, pady=5, sticky="w")
 
         button_frame = ctk.CTkFrame(config_window, fg_color="transparent")
-        button_frame.grid(row=13, column=0, columnspan=2, padx=10, pady=10, sticky="ew")
+        button_frame.grid(row=11, column=0, columnspan=2, padx=10, pady=10, sticky="ew")
         button_frame.grid_columnconfigure(0, weight=1)
         button_frame.grid_columnconfigure(1, weight=1)
 
         save_button = ctk.CTkButton(
             button_frame, text="Save",
             command=lambda: save_config(
-                config_window, email_entry, pass_entry, browser_var,
-                show_ip_var, show_console_var, auto_login_var, deepthink_var, search_var
+                config_window,
+                browser_var,
+                show_ip_var,
+                show_console_var,
+                d_email_entry,
+                d_pass_entry,
+                d_auto_login_var,
+                d_text_file_var,
+                d_deepthink_var,
+                d_search_var
             )
         )
         save_button.grid(row=0, column=0, padx=5, sticky="ew")
-
+        
         cancel_button = ctk.CTkButton(button_frame, text="Cancel", command=config_window.destroy)
         cancel_button.grid(row=0, column=1, padx=5, sticky="ew")
 
@@ -309,35 +303,35 @@ def open_config_window():
     except Exception as e:
         print(f"Error opening config window: {e}")
 
-def save_config(config_window, email_entry, pass_entry, browser_var, show_ip_var, show_console_var, auto_login_var, deepthink_var, search_var):
+def save_config(
+        config_window,
+        browser_var,
+        show_ip_var,
+        show_console_var,
+        d_email_entry,
+        d_pass_entry,
+        d_auto_login_var,
+        d_text_file_var,
+        d_deepthink_var,
+        d_search_var
+    ):
     try:
-        global config_email, config_password, config_browser, config_show_ip, config_show_console, console_window, config_auto_login, config_deepthink, config_search
+        config["browser"] = browser_var.get()
+        config["show_ip"] = show_ip_var.get()
+        config["show_console"] = show_console_var.get()
 
-        config_email = email_entry.get()
-        config_password = pass_entry.get()
-        config_browser = browser_var.get()
-        config_show_ip = show_ip_var.get()
-        config_show_console = show_console_var.get()
-        config_auto_login = auto_login_var.get()
-        config_deepthink = deepthink_var.get()
-        config_search = search_var.get()
-
-        config_manager.save_config(
-            save_path,
-            config_email,
-            config_password,
-            config_browser,
-            config_show_ip,
-            config_show_console,
-            config_auto_login,
-            config_deepthink,
-            config_search
-        )
-
-        api.assign_response_config(config_deepthink, config_search)
+        config["models"]["deepseek"]["email"] = d_email_entry.get()
+        config["models"]["deepseek"]["password"] = d_pass_entry.get()
+        config["models"]["deepseek"]["auto_login"] = d_auto_login_var.get()
+        config["models"]["deepseek"]["text_file"] = d_text_file_var.get()
+        config["models"]["deepseek"]["deepthink"] = d_deepthink_var.get()
+        config["models"]["deepseek"]["search"] = d_search_var.get()
+        
+        manager.save_config(config)
+        api.assign_config(config)
         
         if console_window:
-            toggle_console_window(config_show_console)
+            toggle_console_window(config["show_console"])
 
         print("Saved config.")
         config_window.destroy()
@@ -353,14 +347,14 @@ def open_credits():
 
 def create_gui():
     try:
-        global root, textbox, console_window, icon_path
+        global root, textbox, console_window, icon_path, version
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("blue")
         
         load_files()
-
+        
         root = ctk.CTk()
-        root.title("INTENSE RP API V2.2")
+        root.title(f"INTENSE RP API V{version} BETA")
 
         if icon_path:
             root.iconbitmap(default=icon_path)
@@ -369,7 +363,7 @@ def create_gui():
         y = (root.winfo_screenheight() - 500) // 2
         root.geometry(f"400x500+{x}+{y}")
         root.minsize(200, 250)
-
+        
         def on_closing():
             api.close_selenium()
 
@@ -380,12 +374,26 @@ def create_gui():
         root.grid_rowconfigure(1, weight=1)
         root.grid_columnconfigure(0, weight=1)
 
-        title_label = ctk.CTkLabel(root, text="INTENSE RP API V2.2", font=("Arial", 18, "bold"))
+        title_label = ctk.CTkLabel(root, text=f"INTENSE RP API V{version} BETA", font=("Arial", 18, "bold"))
         title_label.grid(row=0, column=0, padx=10, pady=(10, 0), sticky="nsew")
 
         textbox = ctk.CTkTextbox(root, state="disabled", font=("Arial", 16), wrap="none")
         textbox.grid(row=1, column=0, padx=10, pady=10, sticky="nsew")
-        add_colors(textbox)
+        
+        color_map = {
+            "red": "red",
+            "green": "#13ff00",
+            "yellow": "yellow",
+            "blue": "blue",
+            "cyan": "cyan",
+            "white": "white",
+            "purple": "#e400ff",
+            "orange": "orange",
+            "pink": "pink"
+        }
+        
+        for tag, color in color_map.items():
+            textbox.tag_config(tag, foreground=color)
 
         api.assign_textbox(textbox)
 
@@ -400,7 +408,7 @@ def create_gui():
 
         original_stdout = sys.stdout
         original_stderr = sys.stderr
-
+        
         try:
             create_console_window()
             sys.stdout = ConsoleRedirector(console_add)
@@ -410,7 +418,7 @@ def create_gui():
             sys.stderr = original_stderr
             print(f"Falling back to default console: {e}")
 
-        if console_window and config_show_console:
+        if console_window and config["show_console"]:
             root.after(100, lambda: toggle_console_window(True))
             print("Console window created.")
         
