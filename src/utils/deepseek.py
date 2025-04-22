@@ -149,17 +149,30 @@ def get_last_message(driver):
         if messages:
             last_message = messages[-1].get_attribute("innerHTML")
             
-            last_message = re.sub(r"</?em>", "*", last_message)
-            last_message = re.sub(r"</?strong>", "", last_message)
-            last_message = re.sub(r"<p>", "", last_message)
-            last_message = re.sub(r"</p>(?!$)", "\n\n", last_message)
-            last_message = re.sub(r"</p>$", "", last_message)
+            # Preserve XML tags during processing
+            last_message = re.sub(r'(<think>.*?</think>|<infobox>.*?</infobox>)', 
+                                lambda m: m.group(0).replace('<', '\x00').replace('>', '\x01'), 
+                                last_message, 
+                                flags=re.DOTALL)
 
-            last_message = re.sub(r'\*{2,}', '*', last_message)
-            last_message = re.sub(r'"{2,}', '"', last_message)
-            last_message = re.sub(r'\*{2,}', '“', last_message)
-            last_message = re.sub(r'\*{2,}', '”', last_message)
-            return last_message
+            # Remove HTML tags while handling formatting
+            last_message = re.sub(r'<p class="ds-markdown-paragraph">', '\n', last_message)  # New paragraph handling
+            last_message = re.sub(r'</?p[^>]*>', '\n\n', last_message)  # All other p tags
+            last_message = re.sub(r'<br\s*/?>', '\n', last_message)  # Line breaks
+            last_message = re.sub(r'</?em>', '*', last_message)  # Italics
+            last_message = re.sub(r'</?strong>', '', last_message)  # Remove bold
+            last_message = re.sub(r'<[^>]+>', '', last_message)  # Remove remaining HTML
+
+            # Restore XML tags
+            last_message = last_message.replace('\x00', '<').replace('\x01', '>')
+
+            # Clean up markdown artifacts
+            last_message = re.sub(r'\n{3,}', '\n\n', last_message)  # Reduce multiple newlines
+            last_message = re.sub(r'(\S)\n(\S)', r'\1\n\n\2', last_message)  # Add spacing between paragraphs
+            last_message = re.sub(r'\*{2,}', '*', last_message)  # Fix asterisks
+            last_message = re.sub(r'"{2,}', '"', last_message)  # Fix quotes
+            
+            return last_message.strip()
         else:
             return None
     
