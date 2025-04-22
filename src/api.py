@@ -161,6 +161,8 @@ def deepseek_response(character_info, streaming, deepseek_deepthink, deepseek_se
                         diff = new_text[len(last_text):]
                         last_text = new_text
                         yield json.create_response_streaming(diff)
+
+                    time.sleep(0.5)
                 
                 response = deepseek.closing_symbol(last_text) if last_text else "Error receiving response."
                 yield json.create_response_streaming(response)
@@ -186,6 +188,8 @@ def deepseek_response(character_info, streaming, deepseek_deepthink, deepseek_se
 
                     if new_text and new_text.startswith(initial_text):
                         last_text = new_text
+
+                    time.sleep(0.5)
                 
                 response = (last_text + deepseek.closing_symbol(last_text)) if last_text else "Error receiving response."
                 show_message("[color:white]- [color:green]Completed.")
