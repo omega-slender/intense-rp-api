@@ -223,7 +223,7 @@ def run_services():
             
             clear_messages()
             show_message("[color:red]API IS NOW ACTIVE!")
-            show_message("[color:cyan]WELCOME TO INTENSE RP API V2.0")
+            show_message("[color:cyan]WELCOME TO INTENSE RP API")
             show_message("[color:yellow]URL 1: [color:white]http://127.0.0.1:5000/")
             
             if config["show_ip"]:

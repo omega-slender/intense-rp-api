@@ -3,7 +3,7 @@ import utils.config_manager as config_manager
 import customtkinter as ctk
 
 root = None
-version = 2.3
+version = 2.4
 
 console_window = None
 console_textbox = None

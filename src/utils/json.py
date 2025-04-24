@@ -12,7 +12,6 @@ def process_character(put_data):
         
         formatted_messages = [f"{msg.get('role', '')}: {msg.get('content', '')}" for msg in messages]
         character_info = "\n\n".join(formatted_messages).replace("system: ", "")
-        character_info = re.sub(r"(\w+): (\w+): ", r"\1: ", character_info)
         
         character_name_match = re.search(r'DATA1: "([^\"]*)"', character_info)
         user_name_match = re.search(r'DATA2: "([^\"]*)"', character_info)
@@ -28,12 +27,10 @@ def process_character(put_data):
         character_info = character_info.replace("assistant:", character_name + ":").replace("user:", user_name + ":")
         character_info = character_info.replace("{{temperature}}", str(temperature)).replace("{{max_tokens}}", str(max_tokens))
         
-        character_info = re.sub(r"((?:[^\n:]+):\s*){2,}", lambda m: m.group(0).split(":")[0] + ": ", character_info)
         character_info = re.sub(r'\n{3,}', '\n\n', character_info)
-
         character_info = f"[Important Information]\n{character_info}"
         
-        return character_info
+        return character_info.strip()
     except Exception as e:
         print(f"Error processing character info: {e}")
         return None
