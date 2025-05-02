@@ -1,20 +1,26 @@
-import threading, webbrowser, api, re, os, sys
-import utils.config_manager as config_manager
-import customtkinter as ctk
+import threading, webbrowser, api, sys, re
+import utils.response_utils as response_utils
+import utils.deepseek_driver as deepseek
+import utils.storage_manager as storage
+import utils.process_manager as process
+import utils.gui_builder as gui_builder
+from packaging import version
+
+__version__ = "2.5.0"
 
 root = None
-version = 2.4
+storage_manager = None
+icon_path = None
 
 console_window = None
 console_textbox = None
 textbox = None
 
-manager = None
-icon_path = None
-
-config = {
+config = {}
+original_config = {
     "browser": "Chrome",
     "model": "DeepSeek",
+    "check_version": True,
     "show_ip": False,
     "show_console": False,
     "models": {
@@ -29,6 +35,10 @@ config = {
     }
 }
 
+# =============================================================================================================================
+# Console Window
+# =============================================================================================================================
+
 class ConsoleRedirector:
     def __init__(self, callback):
         self.callback = callback
@@ -39,390 +49,289 @@ class ConsoleRedirector:
                 self.callback(text)
             except Exception:
                 pass
-
+    
     def flush(self):
         pass
 
-def load_files():
-    global icon_path, manager, config
-    
-    script_path = os.path.dirname(os.path.realpath(__file__))
-    
-    if os.path.isfile(script_path):
-        icon_base = os.path.dirname(script_path)
-        base_path = os.path.dirname(os.path.dirname(script_path))
-    else:
-        icon_base = script_path
-        base_path = script_path
-
-    possible_icon_path = os.path.join(icon_base, "icon.ico")
-    icon_path = possible_icon_path if os.path.isfile(possible_icon_path) else None
-    save_path = os.path.join(base_path, "save")
-
-    manager = config_manager.EncryptedConfigManager(save_path)
-    config = manager.load_config(config)
-    
-def create_console_window():
+def create_console_window() -> None:
     global console_window, console_textbox
-    console_window = ctk.CTkToplevel()
-    console_window.title("Console")
-    console_window.geometry("600x300")
-    console_window.minsize(200, 200)
-    console_window.withdraw()
-    console_window.protocol("WM_DELETE_WINDOW", lambda: None)
-    
-    if icon_path:
-        console_window.after(200, lambda: console_window.iconbitmap(icon_path))
-    
-    console_textbox = ctk.CTkTextbox(
-        console_window,
-        state="disabled",
-        font=("Arial", 16),
-        wrap="none",
-        border_width=0,
-        corner_radius=0,
-        fg_color="black",
-        text_color="white"
-    )
-    console_textbox.pack(expand=True, fill="both")
-
-def toggle_console_window(show):
     try:
-        global root, console_window        
-        if not root or not console_window:
-            return
+        console_window = gui_builder.ConsoleWindow()
+        console_window.create(
+            visible=False,
+            title="Console",
+            width=600,
+            height=300,
+            min_width=200,
+            min_height=200,
+            icon=icon_path
+        )
+        console_window.protocol("WM_DELETE_WINDOW", lambda: None)
+        console_textbox = console_window.create_textbox("console_window")
         
-        is_visible = console_window.winfo_viewable() == 1
-        if show == is_visible:
-            return
-        
-        if show:
-            console_window.update_idletasks()
-            console_window.deiconify()
-            console_window.lift()
-            console_window.attributes("-topmost", False)
+        try:
+            sys.stdout = ConsoleRedirector(console_textbox.add)
+            sys.stderr = ConsoleRedirector(console_textbox.add)
+        except Exception:
+            sys.stdout = sys.__stdout__
+            sys.stderr = sys.__stderr__
 
-            root.update_idletasks()
-            x = root.winfo_x() + (root.winfo_width() // 2) - (600 // 2)
-            y = root.winfo_y() + (root.winfo_height() // 2) - (300 // 2)
-            console_window.geometry(f"600x300+{x}+{y}")
-            print("Show console window.")
-        else:
-            console_window.withdraw()
-            print("Hide console window.")
+        print("Console window created.")
     except Exception as e:
-        print(f"Error toggling console window: {e}")
+        print(f"Error creating console window: {e}")
 
-def console_add(text):
+def start_services() -> None:
     try:
-        global console_textbox
-        if not console_textbox:
-            return
-        
-        console_textbox.configure(state="normal")
-        console_textbox.insert("end", text)
-        console_textbox.configure(state="disabled")
-        console_textbox.see("end")
-    except Exception:
-        pass
-
-def textbox_add(widget, text):
-    try:
-        if not widget:
-            return
-        
-        print(text)
-        pattern = r'\[color:(\w+)\]'
-        parts = re.split(pattern, text)
-        current_tag = "white"
-        
-        widget.configure(state="normal")
-        for i, part in enumerate(parts):
-            if i % 2 == 0:
-                if part:
-                    widget.insert("end", part, current_tag)
-            else:
-                current_tag = part
-        
-        widget.insert("end", "\n")
-        widget.configure(state="disabled")
-        widget.see("end")
-    except Exception as e:
-        print(f"Error adding text to textbox: {e}")
-
-def textbox_clear(widget):
-    try:
-        if not widget:
-            return
-        
-        widget.configure(state="normal")
-        widget.delete("1.0", "end")
-        widget.configure(state="disabled")
-    except Exception as e:
-        print(f"Error clearing textbox: {e}")
-
-def start_services():
-    try:
-        textbox_clear(textbox)
-        textbox_add(textbox, "[color:green]Please wait...")
-        
-        api.assign_config(config)
+        textbox.clear()
+        textbox.colored_add("[color:green]Please wait...")
+        api.config = config
         threading.Thread(target=api.run_services, daemon=True).start()
     except Exception as e:
-        textbox_clear(textbox)
-        textbox_add(textbox, "[color:red]Selenium failed to start.")
+        textbox.clear()
+        textbox.colored_add("[color:red]Selenium failed to start.")
         print(f"Error starting services: {e}")
 
-def open_config_window():
+# =============================================================================================================================
+# Config Window
+# =============================================================================================================================
+
+def on_console_toggle(value: bool) -> None:
     try:
-        config_window = ctk.CTkToplevel(root)
-        config_window.title("Settings")
+        if console_window:
+            console_window.show(show=value, root=root, center=True)
+    except Exception as e:
+        print(f"Error when toggling console visibility: {e}")
+
+def open_config_window() -> None:
+    global root, config_window
+    try:
+        config_window = gui_builder.ConfigWindow()
+        config_window.create(
+            visible=True,
+            title="Settings",
+            width=400,
+            height=530,
+            min_width=400,
+            min_height=530,
+            icon=icon_path
+        )
         config_window.transient(root)
         config_window.grab_set()
         config_window.focus_force()
         config_window.lift()
-
-        if icon_path:
-            config_window.after(200, lambda: config_window.iconbitmap(icon_path))
-
-        root.update_idletasks()
-        x = root.winfo_x() + (root.winfo_width() // 2) - (400 // 2)
-        y = root.winfo_y() + (root.winfo_height() // 2) - (470 // 2)
-        config_window.geometry(f"400x470+{x}+{y}")
-        config_window.minsize(400, 470)
-
-        for i in range(12):
-            config_window.grid_rowconfigure(i, weight=1)
-        
+        config_window.center(root)
+            
         config_window.grid_columnconfigure(0, weight=1)
         config_window.grid_columnconfigure(1, weight=1)
+
+        deepseek_model = config["models"]["deepseek"]
+        deepseek_frame = config_window.create_section_frame(id="deepseek_frame", top_padding=10, bottom_padding=10, bg_color="#272727", row=0, row_grid=True)
+        deepseek_frame.grid_columnconfigure(0, weight=1)
+        deepseek_frame.grid_columnconfigure(1, weight=1)
+
+        deepseek_frame.create_title(id="deepseek_settings", text="DeepSeek Settings", row=0, row_grid=True)
+        deepseek_frame.create_entry(id="email", label_text="Email:", default_value=deepseek_model["email"], row=1, row_grid=True)
+        deepseek_frame.create_password(id="password", label_text="Password:", default_value=deepseek_model["password"], row=2, row_grid=True)
+        deepseek_frame.create_switch(id="auto_login", label_text="Auto login:", default_value=deepseek_model["auto_login"], row=3, row_grid=True)
+        deepseek_frame.create_switch(id="text_file", label_text="Text file:", default_value=deepseek_model["text_file"], row=4, row_grid=True)
+        deepseek_frame.create_switch(id="deepthink", label_text="Deepthink:", default_value=deepseek_model["deepthink"], row=5, row_grid=True)
+        deepseek_frame.create_switch(id="search", label_text="Search:", default_value=deepseek_model["search"], row=6, row_grid=True)
         
-        d_settings_label = ctk.CTkLabel(config_window, text="DeepSeek Settings", font=("Arial", 14, "bold"))
-        d_settings_label.grid(row=0, column=0, columnspan=2, padx=10, pady=(10, 5), sticky="w")
+        advanced_frame = config_window.create_section_frame(id="advanced_frame", top_padding=0, bottom_padding=10, bg_color="#272727", row=1, row_grid=True)
+        advanced_frame.grid_columnconfigure(0, weight=1)
+        advanced_frame.grid_columnconfigure(1, weight=1)
 
-        d_email_label = ctk.CTkLabel(config_window, text="Email:")
-        d_email_label.grid(row=1, column=0, padx=10, pady=5, sticky="w")
-        d_email_entry = ctk.CTkEntry(config_window, width=250)
-        d_email_entry.grid(row=1, column=1, padx=10, pady=5, sticky="ew")
-        d_email_entry.insert(0, config["models"]["deepseek"]["email"])
-
-        d_pass_label = ctk.CTkLabel(config_window, text="Password:")
-        d_pass_label.grid(row=2, column=0, padx=10, pady=5, sticky="w")
-
-        d_pass_frame = ctk.CTkFrame(config_window, fg_color="transparent")
-        d_pass_frame.grid(row=2, column=1, padx=10, pady=5, sticky="ew")
-        d_pass_frame.grid_columnconfigure(0, weight=1)
-
-        d_pass_entry = ctk.CTkEntry(d_pass_frame, show="*")
-        d_pass_entry.grid(row=0, column=0, padx=(0, 5), sticky="ew")
-        d_pass_entry.insert(0, config["models"]["deepseek"]["password"])
-
-        def toggle_password_visibility():
-            if d_pass_entry.cget("show") == "*":
-                d_pass_entry.configure(show="")
-                d_toggle_button.configure(text="Hide")
-            else:
-                d_pass_entry.configure(show="*")
-                d_toggle_button.configure(text="Show")
-
-        d_toggle_button = ctk.CTkButton(d_pass_frame, text="Show", width=60, command=toggle_password_visibility)
-        d_toggle_button.grid(row=0, column=1, sticky="e")
-
-        d_auto_login_label = ctk.CTkLabel(config_window, text="Auto Login:")
-        d_auto_login_label.grid(row=3, column=0, padx=10, pady=5, sticky="w")
-        d_auto_login_var = ctk.BooleanVar(value=config["models"]["deepseek"]["auto_login"])
-        d_auto_login_switch = ctk.CTkSwitch(config_window, variable=d_auto_login_var, text="")
-        d_auto_login_switch.grid(row=3, column=1, padx=10, pady=5, sticky="w")
-
-        d_text_file_label = ctk.CTkLabel(config_window, text="Text file:")
-        d_text_file_label.grid(row=4, column=0, padx=10, pady=5, sticky="w")
-        d_text_file_var = ctk.BooleanVar(value=config["models"]["deepseek"]["text_file"])
-        d_text_file_switch = ctk.CTkSwitch(config_window, variable=d_text_file_var, text="")
-        d_text_file_switch.grid(row=4, column=1, padx=10, pady=5, sticky="w")
+        advanced_frame.create_title(id="advanced_settings", text="Advanced Settings", row=0, row_grid=True)
+        advanced_frame.create_option_menu(id="browser", label_text="Browser:", default_value=config["browser"], options=["Chrome", "Firefox", "Edge", "Safari"], row=1, row_grid=True)
+        advanced_frame.create_switch(id="check_version", label_text="Check version at startup:", default_value=config["check_version"], row=3, row_grid=True)
+        advanced_frame.create_switch(id="show_console", label_text="Show Console:", default_value=config["show_console"], command=on_console_toggle, row=4, row_grid=True)
+        advanced_frame.create_switch(id="show_ip", label_text="Show IP:", default_value=config["show_ip"], row=5, row_grid=True)
         
-        d_deepthink_label = ctk.CTkLabel(config_window, text="DeepThink:")
-        d_deepthink_label.grid(row=5, column=0, padx=10, pady=5, sticky="w")
-        d_deepthink_var = ctk.BooleanVar(value=config["models"]["deepseek"]["deepthink"])
-        d_deepthink_switch = ctk.CTkSwitch(config_window, variable=d_deepthink_var, text="")
-        d_deepthink_switch.grid(row=5, column=1, padx=10, pady=5, sticky="w")
-
-        d_search_label = ctk.CTkLabel(config_window, text="Search:")
-        d_search_label.grid(row=6, column=0, padx=10, pady=5, sticky="w")
-        d_search_var = ctk.BooleanVar(value=config["models"]["deepseek"]["search"])
-        d_search_switch = ctk.CTkSwitch(config_window, variable=d_search_var, text="")
-        d_search_switch.grid(row=6, column=1, padx=10, pady=5, sticky="w")
-
-        advanced_label = ctk.CTkLabel(config_window, text="Advanced Settings", font=("Arial", 14, "bold"))
-        advanced_label.grid(row=7, column=0, columnspan=2, padx=10, pady=(10, 5), sticky="w")
-
-        browser_label = ctk.CTkLabel(config_window, text="Browser:")
-        browser_label.grid(row=8, column=0, padx=10, pady=5, sticky="w")
-        browser_options = ["Chrome", "Firefox", "Edge", "Safari"]
-        browser_var = ctk.StringVar(value=config["browser"])
-        browser_menu = ctk.CTkOptionMenu(config_window, variable=browser_var, values=browser_options)
-        browser_menu.grid(row=8, column=1, padx=10, pady=5, sticky="ew")
-
-        show_ip_label = ctk.CTkLabel(config_window, text="Show IP:")
-        show_ip_label.grid(row=9, column=0, padx=10, pady=5, sticky="w")
-        show_ip_var = ctk.BooleanVar(value=config["show_ip"])
-        show_ip_switch = ctk.CTkSwitch(config_window, variable=show_ip_var, text="")
-        show_ip_switch.grid(row=9, column=1, padx=10, pady=5, sticky="w")
-
-        show_console_label = ctk.CTkLabel(config_window, text="Show Console:")
-        show_console_label.grid(row=10, column=0, padx=10, pady=5, sticky="w")
-        show_console_var = ctk.BooleanVar(value=config["show_console"])
-        show_console_switch = ctk.CTkSwitch(config_window, variable=show_console_var, text="")
-        show_console_switch.grid(row=10, column=1, padx=10, pady=5, sticky="w")
-
-        button_frame = ctk.CTkFrame(config_window, fg_color="transparent")
-        button_frame.grid(row=11, column=0, columnspan=2, padx=10, pady=10, sticky="ew")
+        button_frame = config_window.create_section_frame(id="button_frame", top_padding=0, bottom_padding=10, row=2, bg_color="transparent")
         button_frame.grid_columnconfigure(0, weight=1)
         button_frame.grid_columnconfigure(1, weight=1)
 
-        save_button = ctk.CTkButton(
-            button_frame, text="Save",
-            command=lambda: save_config(
-                config_window,
-                browser_var,
-                show_ip_var,
-                show_console_var,
-                d_email_entry,
-                d_pass_entry,
-                d_auto_login_var,
-                d_text_file_var,
-                d_deepthink_var,
-                d_search_var
-            )
-        )
-        save_button.grid(row=0, column=0, padx=5, sticky="ew")
-        
-        cancel_button = ctk.CTkButton(button_frame, text="Cancel", command=config_window.destroy)
-        cancel_button.grid(row=0, column=1, padx=5, sticky="ew")
+        button_frame.create_button(id="save", text="Save", command=lambda: save_config(config_window, deepseek_frame, advanced_frame), row=0, column=0)
+        button_frame.create_button(id="cancel", text="Cancel", command=config_window.destroy, row=0, column=1)
 
         print("Settings window created.")
     except Exception as e:
         print(f"Error opening config window: {e}")
 
 def save_config(
-        config_window,
-        browser_var,
-        show_ip_var,
-        show_console_var,
-        d_email_entry,
-        d_pass_entry,
-        d_auto_login_var,
-        d_text_file_var,
-        d_deepthink_var,
-        d_search_var
-    ):
+        config_window: gui_builder.ConfigWindow,
+        deepseek_frame: gui_builder.ConfigFrame,
+        advanced_frame: gui_builder.ConfigFrame
+    ) -> None:
     try:
-        config["browser"] = browser_var.get()
-        config["show_ip"] = show_ip_var.get()
-        config["show_console"] = show_console_var.get()
-
-        config["models"]["deepseek"]["email"] = d_email_entry.get()
-        config["models"]["deepseek"]["password"] = d_pass_entry.get()
-        config["models"]["deepseek"]["auto_login"] = d_auto_login_var.get()
-        config["models"]["deepseek"]["text_file"] = d_text_file_var.get()
-        config["models"]["deepseek"]["deepthink"] = d_deepthink_var.get()
-        config["models"]["deepseek"]["search"] = d_search_var.get()
+        global original_config, config
         
-        manager.save_config(config)
-        api.assign_config(config)
+        email_entry = deepseek_frame.get_widget("email")
+        password_entry = deepseek_frame.get_widget("password")
+        auto_login = deepseek_frame.get_widget_value("auto_login")
         
-        if console_window:
-            toggle_console_window(config["show_console"])
+        def is_valid_email(email: str) -> bool:
+            return re.match(r"^[\w\.-]+@[\w\.-]+\.\w+$", email) is not None
+        
+        def is_valid_password(password: str, min_length: int = 6) -> bool:
+            return len(password.strip()) >= min_length
+        
+        def set_entry_style(entry, valid: bool) -> None:
+            entry.configure(border_color="gray" if valid else "red")
+        
+        if auto_login:
+            valid_email = is_valid_email(email_entry.get())
+            set_entry_style(email_entry, valid_email)
+            
+            valid_password = is_valid_password(password_entry.get())
+            set_entry_style(password_entry, valid_password)
 
-        print("Saved config.")
+            if not valid_email or not valid_password:
+                return
+        else:
+            set_entry_style(email_entry, True)
+            set_entry_style(password_entry, True)
+
+        config["browser"] = advanced_frame.get_widget_value("browser")
+        config["check_version"] = advanced_frame.get_widget_value("check_version")
+        config["show_console"] = advanced_frame.get_widget_value("show_console")
+        config["show_ip"] = advanced_frame.get_widget_value("show_ip")
+        
+        deepseek_model = config["models"]["deepseek"]
+        for key in deepseek_model:
+            deepseek_model[key] = deepseek_frame.get_widget_value(key)
+        
+        storage_manager.save_config(path_root="executable", sub_path="save", new=config, original=original_config)
+        api.config = config
+        
         config_window.destroy()
+        print("The config window was closed successfully.")
     except Exception as e:
         print(f"Error saving config: {e}")
 
-def open_credits():
+# =============================================================================================================================
+# Credits
+# =============================================================================================================================
+
+def open_credits() -> None:
     try:
-        print("Link opened.")
         webbrowser.open("https://linktr.ee/omega_slender")
+        print("Credits link opened.")
     except Exception as e:
         print(f"Error opening credits: {e}")
 
-def create_gui():
+# =============================================================================================================================
+# Update Window
+# =============================================================================================================================
+
+def create_update_window(last_version: str) -> None:
+    global root, icon_path
     try:
-        global root, textbox, console_window, icon_path, version
-        ctk.set_appearance_mode("dark")
-        ctk.set_default_color_theme("blue")
-        
-        load_files()
-        
-        root = ctk.CTk()
-        root.title(f"INTENSE RP API V{version}")
+        update_window = gui_builder.UpdateWindow()
+        update_window.create(
+            visible=True,
+            title=f"New version available",
+            width=250,
+            height=110,
+            icon=icon_path
+        )
+        update_window.resizable(False, False)
+        update_window.transient(root)
+        update_window.grab_set()
+        update_window.focus_force()
+        update_window.lift()
+        update_window.center(root)
+        update_window.grid_columnconfigure(0, weight=1)
 
-        if icon_path:
-            root.iconbitmap(default=icon_path)
-        
-        x = (root.winfo_screenwidth() - 400) // 2
-        y = (root.winfo_screenheight() - 500) // 2
-        root.geometry(f"400x500+{x}+{y}")
-        root.minsize(200, 250)
-        
-        def on_closing():
-            api.close_selenium()
+        update_window.create_title(id="title", text=f"VERSION {last_version} AVAILABLE", row=0, row_grid=True)
+        update_window.create_button(id="download", text="Download", command=lambda: open_github(update_window), row=1, row_grid=True)
+        update_window.create_button(id="close", text="Close", command=update_window.destroy, row=2, row_grid=True)
 
-            if root:
-                root.destroy()
+        print("Update window created.")
+    except Exception as e:
+        print(f"Error opening update window: {e}")
+
+def open_github(update_window: gui_builder.UpdateWindow) -> None:
+    try:
+        webbrowser.open("https://github.com/omega-slender/intense-rp-api")
+        update_window.destroy()
+        print("Github link opened.")
+    except Exception as e:
+        print(f"Error opening github: {e}")
+
+# =============================================================================================================================
+# Root Window
+# =============================================================================================================================
+
+def on_close_root() -> None:
+    global root, storage_manager
+    try:
+        sys.stdout = sys.__stdout__
+        sys.stderr = sys.__stderr__
+
+        api.close_selenium()
+        process.kill_driver_processes()
+
+        temp_files = storage_manager.get_temp_files()
+        if temp_files:
+            for file in temp_files:
+                storage_manager.delete_file("temp", file)
+
+        if root:
+            root.destroy()
+
+        print("The program was successfully closed.")
+    except Exception as e:
+        print(f"Error closing root: {e}")
+
+def create_gui() -> None:
+    global __version__, root, storage_manager, original_config, config, icon_path, textbox, console_window
+    try:
+        storage_manager = storage.StorageManager()
+        icon_path = storage_manager.get_existing_path(path_root="base", relative_path="icon.ico")
+
+        deepseek.manager = storage_manager
+        response_utils.__version__ = __version__
         
-        root.protocol("WM_DELETE_WINDOW", on_closing)
-        root.grid_rowconfigure(1, weight=1)
+        gui_builder.apply_appearance()
+        root = gui_builder.RootWindow()
+        root.create(
+            title=f"INTENSE RP API V{__version__}",
+            width=400,
+            height=500,
+            min_width=250,
+            min_height=250,
+            icon=icon_path
+        )
+        
         root.grid_columnconfigure(0, weight=1)
-
-        title_label = ctk.CTkLabel(root, text=f"INTENSE RP API V{version}", font=("Arial", 18, "bold"))
-        title_label.grid(row=0, column=0, padx=10, pady=(10, 0), sticky="nsew")
-
-        textbox = ctk.CTkTextbox(root, state="disabled", font=("Arial", 16), wrap="none")
-        textbox.grid(row=1, column=0, padx=10, pady=10, sticky="nsew")
+        root.protocol("WM_DELETE_WINDOW", on_close_root)
+        root.center()
         
-        color_map = {
-            "red": "red",
-            "green": "#13ff00",
-            "yellow": "yellow",
-            "blue": "blue",
-            "cyan": "cyan",
-            "white": "white",
-            "purple": "#e400ff",
-            "orange": "orange",
-            "pink": "pink"
-        }
+        root.create_title(id="title", text=f"INTENSE RP API V{__version__}", row=0)
+        textbox = root.create_textbox(id="textbox", row=1, row_grid=True, bg_color="#272727")
+        root.create_button(id="start", text="Start", command=start_services, row=2)
+        root.create_button(id="settings", text="Settings", command=open_config_window, row=3)
+        root.create_button(id="credits", text="Credits", command=open_credits, row=4)
         
-        for tag, color in color_map.items():
-            textbox.tag_config(tag, foreground=color)
-
-        api.assign_textbox(textbox)
-
-        start_button = ctk.CTkButton(root, text="Start", command=start_services)
-        start_button.grid(row=2, column=0, padx=10, pady=10, sticky="ew")
-
-        config_button = ctk.CTkButton(root, text="Settings", command=open_config_window)
-        config_button.grid(row=3, column=0, padx=10, pady=(0, 10), sticky="ew")
-
-        credits_button = ctk.CTkButton(root, text="Credits", command=open_credits)
-        credits_button.grid(row=4, column=0, padx=10, pady=(0, 10), sticky="ew")
-
-        original_stdout = sys.stdout
-        original_stderr = sys.stderr
+        textbox.add_colors()
+        api.textbox = textbox
         
-        try:
-            create_console_window()
-            sys.stdout = ConsoleRedirector(console_add)
-            sys.stderr = ConsoleRedirector(console_add)
-        except Exception as e:
-            sys.stdout = original_stdout
-            sys.stderr = original_stderr
-            print(f"Falling back to default console: {e}")
-
+        create_console_window()
+        config = storage_manager.load_config(path_root="executable", sub_path="save", original=original_config)
+        
+        if config["check_version"]:
+            current_version = version.parse(__version__)
+            last_version = storage_manager.get_latest_version()
+            if last_version and version.parse(last_version) > current_version:
+                root.after(200, lambda: create_update_window(last_version))
+        
         if console_window and config["show_console"]:
-            root.after(100, lambda: toggle_console_window(True))
-            print("Console window created.")
+            root.after(100, lambda: console_window.show(show=config["show_console"], root=root, center=True))
         
         print("Main window created.")
+        print(f"Executable path: {storage_manager.get_executable_path()}")
+        print(f"Base path: {storage_manager.get_base_path()}")
         root.mainloop()
     except Exception as e:
         print(f"Error creating GUI: {e}")
