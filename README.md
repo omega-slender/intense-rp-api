@@ -71,3 +71,6 @@ If you're having trouble getting past **Cloudflare**, it's highly recommended to
 
 ## 🌐 Contact
 Discover more about me and my projects on my [Linktree](https://linktr.ee/omega_slender).
+
+## ☕ Support My Work
+If you find this project useful and want to support its development, consider buying me a coffee in [Ko-fi](https://ko-fi.com/omega_slender)!  
