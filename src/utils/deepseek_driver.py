@@ -223,13 +223,14 @@ def get_last_message(driver: Driver) -> Optional[str]:
             processed_message = re.sub(r'<li>', '\n- ', processed_message)
             processed_message = re.sub(r'<br\s*/?>', '\n', processed_message, flags=re.IGNORECASE)
 
-            processed_message = re.sub(r'</?code>', '`', processed_message)
+            # The following 4 comments fixes the stripping of <tags>, since they are wanted sometimes. Maybe make a switch in settings to enable/disable them?
+            # processed_message = re.sub(r'</?code>', '`', processed_message)
             processed_message = re.sub(r'</?strong>', '*', processed_message)
             processed_message = re.sub(r'</?em>', '*', processed_message)
 
             processed_message = re.sub(r'&amp;', '&', processed_message)
-            processed_message = re.sub(r'&lt;', '<', processed_message)
-            processed_message = re.sub(r'&gt;', '>', processed_message)
+            # processed_message = re.sub(r'&lt;', '<', processed_message)
+            # processed_message = re.sub(r'&gt;', '>', processed_message)
             processed_message = re.sub(r'&nbsp;', ' ', processed_message)
             processed_message = re.sub(r'&quot;', '"', processed_message)
             
@@ -239,7 +240,7 @@ def get_last_message(driver: Driver) -> Optional[str]:
             clean_text = re.sub(r'\n{3,}', '\n\n', text_only)
             clean_text = re.sub(r'\*{2,}', '*', clean_text)
             clean_text = re.sub(r'"{2,}', '"', clean_text)
-            clean_text = re.sub(r'`{2,}', '`', clean_text)
+            # clean_text = re.sub(r'`{2,}', '`', clean_text)
             
             clean_text = re.sub(r'^\*([^\s*]+)\s\*(.*)$', r'*\1 \2', clean_text, flags=re.MULTILINE)
 
