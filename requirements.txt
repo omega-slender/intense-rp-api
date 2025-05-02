@@ -5,3 +5,7 @@ selenium
 seleniumbase
 cryptography
 webdriver-manager
+packaging
+beautifulsoup4
+psutil
+requests
