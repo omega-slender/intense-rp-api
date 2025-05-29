@@ -389,13 +389,9 @@ class ConfigWindow(ctk.CTkToplevel):
         )
         sidebar_title.grid(row=0, column=0, padx=15, pady=(15, 10), sticky="w")
         
-        # Create scrollable sidebar frame
-        self.sidebar_frame = ctk.CTkScrollableFrame(
+        self.sidebar_frame = ctk.CTkFrame(
             self.sidebar_container,
-            width=150,
-            fg_color="transparent",
-            scrollbar_button_color=("gray70", "gray30"),
-            scrollbar_button_hover_color=("gray60", "gray40")
+            fg_color="transparent"
         )
         self.sidebar_frame.grid(row=1, column=0, sticky="nsew", padx=5, pady=(0, 10))
         self.sidebar_frame.grid_columnconfigure(0, weight=1)
@@ -419,26 +415,18 @@ class ConfigWindow(ctk.CTkToplevel):
         self.button_frame.grid(row=1, column=0, columnspan=2, sticky="ew", padx=10, pady=(0, 10))
         self.button_frame.grid_columnconfigure(0, weight=1)
         
-        # Enable better scrolling
-        self._enable_scrolling()
+        # Enable better scrolling only for content area
+        self._enable_content_scrolling()
         
-    def _enable_scrolling(self):
-        """Enable proper mouse wheel scrolling"""
+    def _enable_content_scrolling(self):
+        """Enable proper mouse wheel scrolling for content area only"""
         def mousewheel_handler(event):
-            # Determine which scrollable frame should receive the scroll event
             x, y = self.winfo_pointerxy()
             try:
                 widget = self.winfo_containing(x, y)
                 
-                # Check if we're over the sidebar area
-                if self._widget_is_in_area(widget, self.sidebar_container):
-                    if hasattr(self.sidebar_frame, '_parent_canvas'):
-                        delta = -1 * (event.delta / 2)
-                        self.sidebar_frame._parent_canvas.yview_scroll(int(delta), "units")
-                    return "break"
-                
                 # Check if we're over the content area
-                elif self._widget_is_in_area(widget, self.content_frame):
+                if self._widget_is_in_area(widget, self.content_frame):
                     if hasattr(self.scrollable_frame, '_parent_canvas'):
                         delta = -1 * (event.delta / 2)
                         self.scrollable_frame._parent_canvas.yview_scroll(int(delta), "units")
@@ -452,38 +440,28 @@ class ConfigWindow(ctk.CTkToplevel):
                 return "break"
         
         self.bind("<MouseWheel>", mousewheel_handler)
-        
         self.bind("<Button-1>", lambda e: self.focus_set())
         
-        self.after(100, self._bind_mousewheel_to_children)
+        # Only bind mousewheel to content area children
+        self.after(100, self._bind_mousewheel_to_content)
 
-    def _bind_mousewheel_to_children(self):
-        """Bind mousewheel events to all child widgets for better scroll detection"""
+    def _bind_mousewheel_to_content(self):
+        """Bind mousewheel events only to content area widgets"""
         def bind_recursive(widget):
             try:
-                widget.bind("<MouseWheel>", self._handle_child_mousewheel)
+                widget.bind("<MouseWheel>", self._handle_content_mousewheel)
                 for child in widget.winfo_children():
                     bind_recursive(child)
             except Exception:
                 pass
         
         bind_recursive(self.scrollable_frame)
-        bind_recursive(self.sidebar_frame)
 
-    def _handle_child_mousewheel(self, event):
-        """Handle mousewheel events from child widgets"""
-        widget = event.widget
-        
-        # Determine which scrollable area this widget belongs to
-        if self._widget_is_in_area(widget, self.sidebar_container):
-            if hasattr(self.sidebar_frame, '_parent_canvas'):
-                delta = -1 * (event.delta / 2)
-                self.sidebar_frame._parent_canvas.yview_scroll(int(delta), "units")
-        elif self._widget_is_in_area(widget, self.content_frame):
-            if hasattr(self.scrollable_frame, '_parent_canvas'):
-                delta = -1 * (event.delta / 2)
-                self.scrollable_frame._parent_canvas.yview_scroll(int(delta), "units")
-        
+    def _handle_content_mousewheel(self, event):
+        """Handle mousewheel events from content area widgets only"""
+        if hasattr(self.scrollable_frame, '_parent_canvas'):
+            delta = -1 * (event.delta / 2)
+            self.scrollable_frame._parent_canvas.yview_scroll(int(delta), "units")
         return "break"
 
     def _widget_is_in_area(self, widget, area):
@@ -500,6 +478,65 @@ class ConfigWindow(ctk.CTkToplevel):
             except:
                 break
         return False
+    
+    def _check_sidebar_overflow(self):
+        """Check if sidebar needs to be scrollable and convert if necessary"""
+        try:
+            self.update_idletasks()
+            
+            # Calculate required height for all buttons
+            button_height = 35  # Height of each button
+            button_spacing = 4  # Spacing between buttons (2 pady * 2)
+            total_buttons = len(self._sidebar_buttons)
+            required_height = total_buttons * (button_height + button_spacing)
+            
+            # Get available height in sidebar
+            available_height = self.sidebar_container.winfo_height() - 60  # Account for title and padding
+            
+            # If content overflows, convert to scrollable frame
+            if required_height > available_height and total_buttons > 3:
+                self._convert_sidebar_to_scrollable()
+                
+        except Exception as e:
+            print(f"Error checking sidebar overflow: {e}")
+    
+    def _convert_sidebar_to_scrollable(self):
+        """Convert sidebar to scrollable frame when needed"""
+        try:
+            current_buttons = list(self._sidebar_buttons.items())
+            self.sidebar_frame.destroy()
+            self.sidebar_frame = ctk.CTkScrollableFrame(
+                self.sidebar_container,
+                width=150,
+                fg_color="transparent",
+                scrollbar_button_color=("gray70", "gray30"),
+                scrollbar_button_hover_color=("gray60", "gray40")
+            )
+            self.sidebar_frame.grid(row=1, column=0, sticky="nsew", padx=5, pady=(0, 10))
+            self.sidebar_frame.grid_columnconfigure(0, weight=1)
+
+            # Re-create all buttons
+            self._sidebar_buttons.clear()
+            for section_id, old_button in current_buttons:
+                new_button = SidebarNavButton(
+                    self.sidebar_frame,
+                    section_id=section_id,
+                    text=old_button.cget("text"),
+                    command=old_button.cget("command")
+                )
+                
+                row = len(self._sidebar_buttons)
+                new_button.grid(row=row, column=0, padx=10, pady=2, sticky="ew")
+                self._sidebar_buttons[section_id] = new_button
+                
+                # Restore active state
+                if old_button._is_active:
+                    new_button.set_active(True)
+            
+            print("Converted sidebar to scrollable due to overflow")
+            
+        except Exception as e:
+            print(f"Error converting sidebar to scrollable: {e}")
         
     def add_sidebar_section(self, section_id: str, title: str, on_click: Callable) -> SidebarNavButton:
         """Add a navigation button to the sidebar"""
@@ -514,6 +551,10 @@ class ConfigWindow(ctk.CTkToplevel):
         button.grid(row=row, column=0, padx=10, pady=2, sticky="ew")
         
         self._sidebar_buttons[section_id] = button
+        
+        # Check if we need to convert to scrollable after adding button
+        self.after(10, self._check_sidebar_overflow)
+        
         return button
     
     def _on_sidebar_click(self, section_id: str, callback: Callable):
