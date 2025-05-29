@@ -7,7 +7,7 @@ import utils.gui_builder as gui_builder
 import utils.logging_manager as logging_manager
 from packaging import version
 
-__version__ = "2.5.0"
+__version__ = "2.6.0"
 
 root = None
 storage_manager = None
