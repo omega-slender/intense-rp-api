@@ -4,12 +4,14 @@ import utils.deepseek_driver as deepseek
 import utils.storage_manager as storage
 import utils.process_manager as process
 import utils.gui_builder as gui_builder
+import utils.logging_manager as logging_manager
 from packaging import version
 
-__version__ = "2.5.0"
+__version__ = "2.6.0"
 
 root = None
 storage_manager = None
+logging_manager_instance = None
 icon_path = None
 
 console_window = None
@@ -32,6 +34,11 @@ original_config = {
             "deepthink": False,
             "search": False
         }
+    },
+    "logging": {
+        "enabled": False,
+        "max_file_size": 1048576,  # 1MB in bytes
+        "max_files": 10
     }
 }
 
@@ -85,6 +92,7 @@ def start_services() -> None:
         textbox.clear()
         textbox.colored_add("[color:green]Please wait...")
         api.config = config
+        api.logging_manager = logging_manager_instance
         threading.Thread(target=api.run_services, daemon=True).start()
     except Exception as e:
         textbox.clear()
@@ -102,6 +110,31 @@ def on_console_toggle(value: bool) -> None:
     except Exception as e:
         print(f"Error when toggling console visibility: {e}")
 
+def format_file_size(size_bytes: int) -> str:
+    """Convert bytes to human readable format"""
+    if size_bytes >= 1024 * 1024:
+        return f"{size_bytes // (1024 * 1024)} MB"
+    elif size_bytes >= 1024:
+        return f"{size_bytes // 1024} KB"
+    else:
+        return f"{size_bytes} B"
+
+def parse_file_size(size_str: str) -> int:
+    """Convert human readable size to bytes"""
+    try:
+        size_str = size_str.strip().upper()
+        if size_str.endswith('MB'):
+            return int(float(size_str[:-2].strip()) * 1024 * 1024)
+        elif size_str.endswith('KB'):
+            return int(float(size_str[:-2].strip()) * 1024)
+        elif size_str.endswith('B'):
+            return int(size_str[:-1].strip())
+        else:
+            # Assume bytes if no unit
+            return int(size_str)
+    except (ValueError, IndexError):
+        return 1048576  # Default 1MB
+
 def open_config_window() -> None:
     global root, config_window
     try:
@@ -110,9 +143,9 @@ def open_config_window() -> None:
             visible=True,
             title="Settings",
             width=400,
-            height=530,
+            height=700,
             min_width=400,
-            min_height=530,
+            min_height=720,
             icon=icon_path
         )
         config_window.transient(root)
@@ -137,7 +170,17 @@ def open_config_window() -> None:
         deepseek_frame.create_switch(id="deepthink", label_text="Deepthink:", default_value=deepseek_model["deepthink"], row=5, row_grid=True)
         deepseek_frame.create_switch(id="search", label_text="Search:", default_value=deepseek_model["search"], row=6, row_grid=True)
         
-        advanced_frame = config_window.create_section_frame(id="advanced_frame", top_padding=0, bottom_padding=10, bg_color="#272727", row=1, row_grid=True)
+        logging_config = config["logging"]
+        logging_frame = config_window.create_section_frame(id="logging_frame", top_padding=0, bottom_padding=10, bg_color="#272727", row=1, row_grid=True)
+        logging_frame.grid_columnconfigure(0, weight=1)
+        logging_frame.grid_columnconfigure(1, weight=1)
+        
+        logging_frame.create_title(id="logging_settings", text="Logging Settings", row=0, row_grid=True)
+        logging_frame.create_switch(id="enabled", label_text="Store logfiles:", default_value=logging_config["enabled"], row=1, row_grid=True)
+        logging_frame.create_entry(id="max_file_size", label_text="Max file size:", default_value=format_file_size(logging_config["max_file_size"]), row=2, row_grid=True)
+        logging_frame.create_entry(id="max_files", label_text="Max files:", default_value=str(logging_config["max_files"]), row=3, row_grid=True)
+        
+        advanced_frame = config_window.create_section_frame(id="advanced_frame", top_padding=0, bottom_padding=10, bg_color="#272727", row=2, row_grid=True)
         advanced_frame.grid_columnconfigure(0, weight=1)
         advanced_frame.grid_columnconfigure(1, weight=1)
 
@@ -147,11 +190,11 @@ def open_config_window() -> None:
         advanced_frame.create_switch(id="show_console", label_text="Show Console:", default_value=config["show_console"], command=on_console_toggle, row=4, row_grid=True)
         advanced_frame.create_switch(id="show_ip", label_text="Show IP:", default_value=config["show_ip"], row=5, row_grid=True)
         
-        button_frame = config_window.create_section_frame(id="button_frame", top_padding=0, bottom_padding=10, row=2, bg_color="transparent")
+        button_frame = config_window.create_section_frame(id="button_frame", top_padding=0, bottom_padding=10, row=3, bg_color="transparent")
         button_frame.grid_columnconfigure(0, weight=1)
         button_frame.grid_columnconfigure(1, weight=1)
 
-        button_frame.create_button(id="save", text="Save", command=lambda: save_config(config_window, deepseek_frame, advanced_frame), row=0, column=0)
+        button_frame.create_button(id="save", text="Save", command=lambda: save_config(config_window, deepseek_frame, logging_frame, advanced_frame), row=0, column=0)
         button_frame.create_button(id="cancel", text="Cancel", command=config_window.destroy, row=0, column=1)
 
         print("Settings window created.")
@@ -161,10 +204,11 @@ def open_config_window() -> None:
 def save_config(
         config_window: gui_builder.ConfigWindow,
         deepseek_frame: gui_builder.ConfigFrame,
+        logging_frame: gui_builder.ConfigFrame,
         advanced_frame: gui_builder.ConfigFrame
     ) -> None:
     try:
-        global original_config, config
+        global original_config, config, logging_manager_instance
         
         email_entry = deepseek_frame.get_widget("email")
         password_entry = deepseek_frame.get_widget("password")
@@ -179,6 +223,7 @@ def save_config(
         def set_entry_style(entry, valid: bool) -> None:
             entry.configure(border_color="gray" if valid else "red")
         
+        # Validate email/password if auto_login is enabled
         if auto_login:
             valid_email = is_valid_email(email_entry.get())
             set_entry_style(email_entry, valid_email)
@@ -192,6 +237,27 @@ def save_config(
             set_entry_style(email_entry, True)
             set_entry_style(password_entry, True)
 
+        # Validate logging settings
+        max_file_size_entry = logging_frame.get_widget("max_file_size")
+        max_files_entry = logging_frame.get_widget("max_files")
+        
+        try:
+            max_file_size_bytes = parse_file_size(max_file_size_entry.get())
+            set_entry_style(max_file_size_entry, True)
+        except:
+            set_entry_style(max_file_size_entry, False)
+            return
+            
+        try:
+            max_files_int = int(max_files_entry.get().strip())
+            if max_files_int < 1 or max_files_int > 100:
+                raise ValueError()
+            set_entry_style(max_files_entry, True)
+        except:
+            set_entry_style(max_files_entry, False)
+            return
+
+        # Save configuration
         config["browser"] = advanced_frame.get_widget_value("browser")
         config["check_version"] = advanced_frame.get_widget_value("check_version")
         config["show_console"] = advanced_frame.get_widget_value("show_console")
@@ -201,8 +267,16 @@ def save_config(
         for key in deepseek_model:
             deepseek_model[key] = deepseek_frame.get_widget_value(key)
         
+        config["logging"]["enabled"] = logging_frame.get_widget_value("enabled")
+        config["logging"]["max_file_size"] = max_file_size_bytes
+        config["logging"]["max_files"] = max_files_int
+        
         storage_manager.save_config(path_root="executable", sub_path="save", new=config, original=original_config)
         api.config = config
+        
+        # Reinitialize logging with new settings
+        if logging_manager_instance:
+            logging_manager_instance.initialize(config)
         
         config_window.destroy()
         print("The config window was closed successfully.")
@@ -285,9 +359,10 @@ def on_close_root() -> None:
         print(f"Error closing root: {e}")
 
 def create_gui() -> None:
-    global __version__, root, storage_manager, original_config, config, icon_path, textbox, console_window
+    global __version__, root, storage_manager, logging_manager_instance, original_config, config, icon_path, textbox, console_window
     try:
         storage_manager = storage.StorageManager()
+        logging_manager_instance = logging_manager.LoggingManager(storage_manager)
         icon_path = storage_manager.get_existing_path(path_root="base", relative_path="icon.ico")
 
         deepseek.manager = storage_manager
@@ -319,6 +394,9 @@ def create_gui() -> None:
         
         create_console_window()
         config = storage_manager.load_config(path_root="executable", sub_path="save", original=original_config)
+        
+        # Initialize logging
+        logging_manager_instance.initialize(config)
         
         if config["check_version"]:
             current_version = version.parse(__version__)

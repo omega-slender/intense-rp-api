@@ -12,6 +12,7 @@ last_driver = 0
 last_response = 0
 textbox = None
 config = {}
+logging_manager = None
 
 @app.route("/models", methods=["GET"])
 def model() -> Response:
@@ -239,9 +240,14 @@ def close_selenium() -> None:
 # =============================================================================================================================
 
 def show_message(text: str) -> None:
-    global textbox
+    global textbox, logging_manager
     try:
         textbox.colored_add(text)
+        
+        # Log the message if logging is enabled
+        if logging_manager:
+            logging_manager.log_message(text)
+            
     except Exception as e:
         print(f"Error showing message: {e}")
 
