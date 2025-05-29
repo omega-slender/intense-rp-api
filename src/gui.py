@@ -145,7 +145,7 @@ def open_config_window() -> None:
         config_window.create(
             visible=True,
             title="Settings",
-            width=750,  # Wider to accommodate sidebar + content
+            width=750,
             height=550,
             min_width=650,
             min_height=500,

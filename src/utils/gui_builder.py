@@ -361,7 +361,6 @@ class ConfigWindow(ctk.CTkToplevel):
         self._last_icon = icon
         self._sidebar_buttons = {}
         self._content_frames = {}
-        self._scroll_sync_enabled = True
 
         _create_parent_window(self, visible, title, width, height, min_width, min_height, icon)
         
@@ -375,22 +374,32 @@ class ConfigWindow(ctk.CTkToplevel):
     
     def _create_layout(self):
         """Create the main sidebar + content layout"""
-        # Create sidebar frame
-        self.sidebar_frame = ctk.CTkFrame(self, width=180, fg_color=("gray95", "gray10"))
-        self.sidebar_frame.grid(row=0, column=0, sticky="nsew", padx=(10, 5), pady=10)
-        self.sidebar_frame.grid_propagate(False)
-        self.sidebar_frame.grid_columnconfigure(0, weight=1)
+        # Create sidebar container
+        self.sidebar_container = ctk.CTkFrame(self, width=180, fg_color=("gray95", "gray10"))
+        self.sidebar_container.grid(row=0, column=0, sticky="nsew", padx=(10, 5), pady=10)
+        self.sidebar_container.grid_propagate(False)
+        self.sidebar_container.grid_columnconfigure(0, weight=1)
+        self.sidebar_container.grid_rowconfigure(1, weight=1)
         
-        # Sidebar title
         sidebar_title = ctk.CTkLabel(
-            self.sidebar_frame, 
+            self.sidebar_container, 
             text="Settings", 
             font=("Arial", 16, "bold"),
             text_color=("gray10", "gray90")
         )
         sidebar_title.grid(row=0, column=0, padx=15, pady=(15, 10), sticky="w")
         
-        # Create content frame with scrollable area
+        # Create scrollable sidebar frame
+        self.sidebar_frame = ctk.CTkScrollableFrame(
+            self.sidebar_container,
+            width=150,
+            fg_color="transparent",
+            scrollbar_button_color=("gray70", "gray30"),
+            scrollbar_button_hover_color=("gray60", "gray40")
+        )
+        self.sidebar_frame.grid(row=1, column=0, sticky="nsew", padx=5, pady=(0, 10))
+        self.sidebar_frame.grid_columnconfigure(0, weight=1)
+        
         self.content_frame = ctk.CTkFrame(self, fg_color=("gray96", "gray13"))
         self.content_frame.grid(row=0, column=1, sticky="nsew", padx=(5, 10), pady=10)
         self.content_frame.grid_columnconfigure(0, weight=1)
@@ -406,13 +415,91 @@ class ConfigWindow(ctk.CTkToplevel):
         self.scrollable_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
         self.scrollable_frame.grid_columnconfigure(0, weight=1)
         
-        # Create button frame at bottom
         self.button_frame = ctk.CTkFrame(self, fg_color="transparent")
         self.button_frame.grid(row=1, column=0, columnspan=2, sticky="ew", padx=10, pady=(0, 10))
         self.button_frame.grid_columnconfigure(0, weight=1)
         
-        # Bind scroll events for synchronization
-        self.scrollable_frame.bind_all("<MouseWheel>", self._on_scroll)
+        # Enable better scrolling
+        self._enable_scrolling()
+        
+    def _enable_scrolling(self):
+        """Enable proper mouse wheel scrolling"""
+        def mousewheel_handler(event):
+            # Determine which scrollable frame should receive the scroll event
+            x, y = self.winfo_pointerxy()
+            try:
+                widget = self.winfo_containing(x, y)
+                
+                # Check if we're over the sidebar area
+                if self._widget_is_in_area(widget, self.sidebar_container):
+                    if hasattr(self.sidebar_frame, '_parent_canvas'):
+                        delta = -1 * (event.delta / 2)
+                        self.sidebar_frame._parent_canvas.yview_scroll(int(delta), "units")
+                    return "break"
+                
+                # Check if we're over the content area
+                elif self._widget_is_in_area(widget, self.content_frame):
+                    if hasattr(self.scrollable_frame, '_parent_canvas'):
+                        delta = -1 * (event.delta / 2)
+                        self.scrollable_frame._parent_canvas.yview_scroll(int(delta), "units")
+                    return "break"
+                    
+            except Exception:
+                # Fallback to content scrolling
+                if hasattr(self.scrollable_frame, '_parent_canvas'):
+                    delta = -1 * (event.delta / 2)
+                    self.scrollable_frame._parent_canvas.yview_scroll(int(delta), "units")
+                return "break"
+        
+        self.bind("<MouseWheel>", mousewheel_handler)
+        
+        self.bind("<Button-1>", lambda e: self.focus_set())
+        
+        self.after(100, self._bind_mousewheel_to_children)
+
+    def _bind_mousewheel_to_children(self):
+        """Bind mousewheel events to all child widgets for better scroll detection"""
+        def bind_recursive(widget):
+            try:
+                widget.bind("<MouseWheel>", self._handle_child_mousewheel)
+                for child in widget.winfo_children():
+                    bind_recursive(child)
+            except Exception:
+                pass
+        
+        bind_recursive(self.scrollable_frame)
+        bind_recursive(self.sidebar_frame)
+
+    def _handle_child_mousewheel(self, event):
+        """Handle mousewheel events from child widgets"""
+        widget = event.widget
+        
+        # Determine which scrollable area this widget belongs to
+        if self._widget_is_in_area(widget, self.sidebar_container):
+            if hasattr(self.sidebar_frame, '_parent_canvas'):
+                delta = -1 * (event.delta / 2)
+                self.sidebar_frame._parent_canvas.yview_scroll(int(delta), "units")
+        elif self._widget_is_in_area(widget, self.content_frame):
+            if hasattr(self.scrollable_frame, '_parent_canvas'):
+                delta = -1 * (event.delta / 2)
+                self.scrollable_frame._parent_canvas.yview_scroll(int(delta), "units")
+        
+        return "break"
+
+    def _widget_is_in_area(self, widget, area):
+        """Check if a widget is within a specific area"""
+        if not widget:
+            return False
+        
+        current = widget
+        while current:
+            if current == area:
+                return True
+            try:
+                current = current.master
+            except:
+                break
+        return False
         
     def add_sidebar_section(self, section_id: str, title: str, on_click: Callable) -> SidebarNavButton:
         """Add a navigation button to the sidebar"""
@@ -423,8 +510,7 @@ class ConfigWindow(ctk.CTkToplevel):
             command=lambda: self._on_sidebar_click(section_id, on_click)
         )
         
-        # Position button
-        row = len(self._sidebar_buttons) + 1
+        row = len(self._sidebar_buttons)
         button.grid(row=row, column=0, padx=10, pady=2, sticky="ew")
         
         self._sidebar_buttons[section_id] = button
@@ -433,6 +519,7 @@ class ConfigWindow(ctk.CTkToplevel):
     def _on_sidebar_click(self, section_id: str, callback: Callable):
         """Handle sidebar button click"""
         self.set_active_section(section_id)
+        self.scroll_to_section(section_id)
         if callback:
             callback()
     
@@ -441,36 +528,33 @@ class ConfigWindow(ctk.CTkToplevel):
         for btn_id, button in self._sidebar_buttons.items():
             button.set_active(btn_id == section_id)
     
-    def _on_scroll(self, event):
-        """Handle scroll synchronization"""
-        if not self._scroll_sync_enabled:
-            return
-        
-        # Simple scroll sync - could be enhanced to detect which section is visible
-        # For now, we'll keep it simple and let manual clicks handle the highlighting
-        pass
-    
     def scroll_to_section(self, section_id: str):
         """Scroll content to show specific section"""
         if section_id in self._content_frames:
             frame = self._content_frames[section_id]
-            # Get the relative position of the frame
             try:
+                self.update_idletasks()
                 frame.update_idletasks()
                 self.scrollable_frame.update_idletasks()
                 
-                # Calculate scroll position
                 frame_y = frame.winfo_y()
-                container_height = self.scrollable_frame.winfo_height()
+                scrollable_height = self.scrollable_frame.winfo_height()
                 
-                if container_height > 0:
-                    scroll_pos = frame_y / container_height
-                    scroll_pos = max(0, min(1, scroll_pos))
+                if scrollable_height > 0 and hasattr(self.scrollable_frame, '_parent_canvas'):
+                    # Calculate scroll position (0.0 to 1.0)
+                    canvas = self.scrollable_frame._parent_canvas
+                    canvas.update_idletasks()
                     
-                    # Disable scroll sync temporarily to prevent feedback loop
-                    self._scroll_sync_enabled = False
-                    self.scrollable_frame._parent_canvas.yview_moveto(scroll_pos)
-                    self.after(100, lambda: setattr(self, '_scroll_sync_enabled', True))
+                    canvas.configure(scrollregion=canvas.bbox("all"))
+                    scroll_top, scroll_bottom = canvas.yview()
+                    total_height = float(canvas.cget("scrollregion").split()[3])
+                    
+                    if total_height > 0:
+                        target_pos = frame_y / total_height
+                        target_pos = max(0.0, min(1.0, target_pos))
+                        
+                        canvas.yview_moveto(target_pos)
+                        
             except Exception as e:
                 print(f"Error scrolling to section: {e}")
     
@@ -496,20 +580,17 @@ class ConfigWindow(ctk.CTkToplevel):
         # Create the frame
         frame = ConfigFrame(self.scrollable_frame, fg_color=bg_color or ("white", "gray20"))
         
-        # Position frame
         row = len(self._content_frames)
         frame.grid(row=row, column=0, sticky="ew", padx=0, pady=(0, 15))
-        frame.grid_columnconfigure(1, weight=1)  # Make second column expandable
+        frame.grid_columnconfigure(1, weight=1)
         
-        # Store frame reference
         self._content_frames[id] = frame
         _save_frame(self, id, frame)
         
-        # Add sidebar navigation
         self.add_sidebar_section(
             section_id=id,
             title=title,
-            on_click=lambda: self.scroll_to_section(id)
+            on_click=lambda: None  # Scrolling is handled in _on_sidebar_click
         )
         
         return frame
