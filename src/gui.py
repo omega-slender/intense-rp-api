@@ -7,7 +7,7 @@ import utils.gui_builder as gui_builder
 import utils.logging_manager as logging_manager
 from packaging import version
 
-__version__ = "2.6.0"
+__version__ = "2.7.0"
 
 root = None
 storage_manager = None
@@ -41,6 +41,9 @@ original_config = {
         "max_files": 10
     }
 }
+
+# Global reference to config window for sidebar navigation
+config_window = None
 
 # =============================================================================================================================
 # Console Window
@@ -142,10 +145,10 @@ def open_config_window() -> None:
         config_window.create(
             visible=True,
             title="Settings",
-            width=400,
-            height=700,
-            min_width=400,
-            min_height=720,
+            width=750,
+            height=550,
+            min_width=650,
+            min_height=500,
             icon=icon_path
         )
         config_window.transient(root)
@@ -153,14 +156,14 @@ def open_config_window() -> None:
         config_window.focus_force()
         config_window.lift()
         config_window.center(root)
-            
-        config_window.grid_columnconfigure(0, weight=1)
-        config_window.grid_columnconfigure(1, weight=1)
 
+        # Create DeepSeek Settings section
         deepseek_model = config["models"]["deepseek"]
-        deepseek_frame = config_window.create_section_frame(id="deepseek_frame", top_padding=10, bottom_padding=10, bg_color="#272727", row=0, row_grid=True)
-        deepseek_frame.grid_columnconfigure(0, weight=1)
-        deepseek_frame.grid_columnconfigure(1, weight=1)
+        deepseek_frame = config_window.create_section_frame(
+            id="deepseek_frame",
+            title="DeepSeek Settings",
+            bg_color=("white", "gray20")
+        )
 
         deepseek_frame.create_title(id="deepseek_settings", text="DeepSeek Settings", row=0, row_grid=True)
         deepseek_frame.create_entry(id="email", label_text="Email:", default_value=deepseek_model["email"], row=1, row_grid=True)
@@ -170,34 +173,57 @@ def open_config_window() -> None:
         deepseek_frame.create_switch(id="deepthink", label_text="Deepthink:", default_value=deepseek_model["deepthink"], row=5, row_grid=True)
         deepseek_frame.create_switch(id="search", label_text="Search:", default_value=deepseek_model["search"], row=6, row_grid=True)
         
+        # Create Logging Settings section
         logging_config = config["logging"]
-        logging_frame = config_window.create_section_frame(id="logging_frame", top_padding=0, bottom_padding=10, bg_color="#272727", row=1, row_grid=True)
-        logging_frame.grid_columnconfigure(0, weight=1)
-        logging_frame.grid_columnconfigure(1, weight=1)
+        logging_frame = config_window.create_section_frame(
+            id="logging_frame",
+            title="Logging Settings",
+            bg_color=("white", "gray20")
+        )
         
         logging_frame.create_title(id="logging_settings", text="Logging Settings", row=0, row_grid=True)
         logging_frame.create_switch(id="enabled", label_text="Store logfiles:", default_value=logging_config["enabled"], row=1, row_grid=True)
         logging_frame.create_entry(id="max_file_size", label_text="Max file size:", default_value=format_file_size(logging_config["max_file_size"]), row=2, row_grid=True)
         logging_frame.create_entry(id="max_files", label_text="Max files:", default_value=str(logging_config["max_files"]), row=3, row_grid=True)
         
-        advanced_frame = config_window.create_section_frame(id="advanced_frame", top_padding=0, bottom_padding=10, bg_color="#272727", row=2, row_grid=True)
-        advanced_frame.grid_columnconfigure(0, weight=1)
-        advanced_frame.grid_columnconfigure(1, weight=1)
+        # Create Advanced Settings section
+        advanced_frame = config_window.create_section_frame(
+            id="advanced_frame",
+            title="Advanced Settings",
+            bg_color=("white", "gray20")
+        )
 
         advanced_frame.create_title(id="advanced_settings", text="Advanced Settings", row=0, row_grid=True)
         advanced_frame.create_option_menu(id="browser", label_text="Browser:", default_value=config["browser"], options=["Chrome", "Firefox", "Edge", "Safari"], row=1, row_grid=True)
-        advanced_frame.create_switch(id="check_version", label_text="Check version at startup:", default_value=config["check_version"], row=3, row_grid=True)
-        advanced_frame.create_switch(id="show_console", label_text="Show Console:", default_value=config["show_console"], command=on_console_toggle, row=4, row_grid=True)
-        advanced_frame.create_switch(id="show_ip", label_text="Show IP:", default_value=config["show_ip"], row=5, row_grid=True)
+        advanced_frame.create_switch(id="check_version", label_text="Check version at startup:", default_value=config["check_version"], row=2, row_grid=True)
+        advanced_frame.create_switch(id="show_console", label_text="Show Console:", default_value=config["show_console"], command=on_console_toggle, row=3, row_grid=True)
+        advanced_frame.create_switch(id="show_ip", label_text="Show IP:", default_value=config["show_ip"], row=4, row_grid=True)
         
-        button_frame = config_window.create_section_frame(id="button_frame", top_padding=0, bottom_padding=10, row=3, bg_color="transparent")
-        button_frame.grid_columnconfigure(0, weight=1)
-        button_frame.grid_columnconfigure(1, weight=1)
+        # Create button section
+        button_container = config_window.create_button_section()
+        button_container.grid_columnconfigure(0, weight=1)
+        button_container.grid_columnconfigure(1, weight=1)
 
-        button_frame.create_button(id="save", text="Save", command=lambda: save_config(config_window, deepseek_frame, logging_frame, advanced_frame), row=0, column=0)
-        button_frame.create_button(id="cancel", text="Cancel", command=config_window.destroy, row=0, column=1)
+        save_button = gui_builder.ctk.CTkButton(
+            button_container, 
+            text="Save", 
+            command=lambda: save_config(config_window, deepseek_frame, logging_frame, advanced_frame),
+            width=80
+        )
+        save_button.grid(row=0, column=0, padx=5, pady=5, sticky="e")
 
-        print("Settings window created.")
+        cancel_button = gui_builder.ctk.CTkButton(
+            button_container, 
+            text="Cancel", 
+            command=config_window.destroy,
+            width=80
+        )
+        cancel_button.grid(row=0, column=1, padx=5, pady=5, sticky="w")
+
+        # Set initial active section
+        config_window.set_active_section("deepseek_frame")
+
+        print("Settings window created with sidebar navigation.")
     except Exception as e:
         print(f"Error opening config window: {e}")
 
