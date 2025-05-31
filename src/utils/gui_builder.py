@@ -415,54 +415,57 @@ class ConfigWindow(ctk.CTkToplevel):
         self.button_frame.grid(row=1, column=0, columnspan=2, sticky="ew", padx=10, pady=(0, 10))
         self.button_frame.grid_columnconfigure(0, weight=1)
         
-        # Enable better scrolling only for content area
         self._enable_content_scrolling()
         
     def _enable_content_scrolling(self):
-        """Enable proper mouse wheel scrolling for content area only"""
+        """Enable proper mouse wheel scrolling for content area only - FIXED"""
         def mousewheel_handler(event):
-            x, y = self.winfo_pointerxy()
             try:
+                x, y = self.winfo_pointerxy()
                 widget = self.winfo_containing(x, y)
                 
-                # Check if we're over the content area
-                if self._widget_is_in_area(widget, self.content_frame):
+                # Only handle scrolling if we're over the scrollable content area
+                # and NOT over an input widget
+                if widget and self._is_over_scrollable_area(widget) and not self._is_input_widget(widget):
                     if hasattr(self.scrollable_frame, '_parent_canvas'):
                         delta = -1 * (event.delta / 2)
                         self.scrollable_frame._parent_canvas.yview_scroll(int(delta), "units")
                     return "break"
+                # If over an input widget or outside scrollable area, let the event propagate normally
+                return None
                     
-            except Exception:
-                # Fallback to content scrolling
-                if hasattr(self.scrollable_frame, '_parent_canvas'):
-                    delta = -1 * (event.delta / 2)
-                    self.scrollable_frame._parent_canvas.yview_scroll(int(delta), "units")
-                return "break"
+            except Exception as e:
+                print(f"Mousewheel handler error: {e}")
+                return None
         
         self.bind("<MouseWheel>", mousewheel_handler)
-        self.bind("<Button-1>", lambda e: self.focus_set())
-        
-        # Only bind mousewheel to content area children
-        self.after(100, self._bind_mousewheel_to_content)
+        self.bind("<Button-4>", mousewheel_handler)  # Linux scroll up
+        self.bind("<Button-5>", mousewheel_handler)  # Linux scroll down
 
-    def _bind_mousewheel_to_content(self):
-        """Bind mousewheel events only to content area widgets"""
-        def bind_recursive(widget):
+    def _is_over_scrollable_area(self, widget):
+        """Check if widget is within the scrollable content area"""
+        if not widget:
+            return False
+        
+        current = widget
+        while current:
+            if current == self.scrollable_frame:
+                return True
             try:
-                widget.bind("<MouseWheel>", self._handle_content_mousewheel)
-                for child in widget.winfo_children():
-                    bind_recursive(child)
-            except Exception:
-                pass
+                current = current.master
+            except:
+                break
+        return False
+    
+    def _is_input_widget(self, widget):
+        """Check if widget is an input widget that should receive focus/events"""
+        if not widget:
+            return False
         
-        bind_recursive(self.scrollable_frame)
-
-    def _handle_content_mousewheel(self, event):
-        """Handle mousewheel events from content area widgets only"""
-        if hasattr(self.scrollable_frame, '_parent_canvas'):
-            delta = -1 * (event.delta / 2)
-            self.scrollable_frame._parent_canvas.yview_scroll(int(delta), "units")
-        return "break"
+        widget_class = widget.__class__.__name__
+        input_widgets = ['CTkEntry', 'CTkTextbox', 'CTkSwitch', 'CTkOptionMenu', 'CTkButton']
+        
+        return widget_class in input_widgets
 
     def _widget_is_in_area(self, widget, area):
         """Check if a widget is within a specific area"""
@@ -484,7 +487,6 @@ class ConfigWindow(ctk.CTkToplevel):
         try:
             self.update_idletasks()
             
-            # Calculate required height for all buttons
             button_height = 35  # Height of each button
             button_spacing = 4  # Spacing between buttons (2 pady * 2)
             total_buttons = len(self._sidebar_buttons)
@@ -493,7 +495,6 @@ class ConfigWindow(ctk.CTkToplevel):
             # Get available height in sidebar
             available_height = self.sidebar_container.winfo_height() - 60  # Account for title and padding
             
-            # If content overflows, convert to scrollable frame
             if required_height > available_height and total_buttons > 3:
                 self._convert_sidebar_to_scrollable()
                 
