@@ -785,7 +785,14 @@ class UpdateWindow(ctk.CTkToplevel):
     def get_widget_value(self, id: str) -> Optional[str]:
         return _get_widget_value(self, id)
     
-    def create_title(self, id: str, text: str, row: int = 0, column: int = 0, row_grid: bool = False) -> ctk.CTkLabel:
+    def create_title(
+            self, 
+            id: str, 
+            text: str, 
+            row: int = 0, 
+            column: int = 0, 
+            row_grid: bool = False
+        ) -> ctk.CTkLabel:
         label = ctk.CTkLabel(self, text=text, font=("Arial", 14, "bold"))
         label.grid(row=row, column=column, padx=UIConstants.PADDING_MEDIUM, pady=(UIConstants.PADDING_MEDIUM, UIConstants.PADDING_MEDIUM), sticky="nsew")
     
@@ -795,7 +802,16 @@ class UpdateWindow(ctk.CTkToplevel):
         _save_widget(self, id, label)
         return label
     
-    def create_button(self, id: str, text: str, command: Optional[Callable] = None, row: int = 0, column: int = 0, row_grid: bool = False) -> ctk.CTkButton:
+    def create_button(
+            self, 
+            id: str, 
+            text: str, 
+            command: Optional[Callable] = None, 
+            row: int = 0, 
+            column: int = 0, 
+            row_grid: bool = False
+        ) -> ctk.CTkButton:
+        
         button = ctk.CTkButton(self, text=text, command=command)
         button.grid(row=row, column=column, padx=UIConstants.PADDING_MEDIUM, pady=(0, UIConstants.PADDING_MEDIUM), sticky="ew")
 
