@@ -3,8 +3,12 @@
 
 ![Preview](https://github.com/omega-slender/intense-rp-api/blob/main/images/Preview.gif)
 
-## ⚠️ Cloudflare Issues
-If you're having trouble getting past **Cloudflare**, it's highly recommended to use **Google Chrome**, as it tends to be the most reliable browser for bypassing Cloudflare verification.
+> ⚠️ **This project is no longer maintained.**
+>
+> The new official version is hosted at [Intense RP NexT](https://github.com/LyubomirT/intense-rp-api-improvements), created by **LyubomirT** with my full authorization.
+>
+> 👉 It is the **official successor** of this project, and I highly recommend downloading and using it for future updates and support.
+
 
 ## 📋 Requirements
 ### 📦 For the Source Code
@@ -33,6 +37,9 @@ If you're having trouble getting past **Cloudflare**, it's highly recommended to
 2. Under **Chat Completion Source**, select **Custom (OpenAI-compatible)**.
 3. In the **Custom Endpoint (Base URL)** field, enter `http://127.0.0.1:5000/` or your personal IP.
 4. Click **Connect**.
+
+## ⚠️ Cloudflare Issues
+If you're having trouble getting past **Cloudflare**, it's highly recommended to use **Google Chrome**, as it tends to be the most reliable browser for bypassing Cloudflare verification.
 
 ### 📝 AI Responde Configuration
 1. Navigate to the **AI Responde Configuration** section.
